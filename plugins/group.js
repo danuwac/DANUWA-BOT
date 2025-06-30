@@ -42,35 +42,30 @@ cmd({
   category: "group",
   filename: __filename,
 }, async (robin, mek, m, { isGroup, isAdmins, reply, participants }) => {
-  if (!isGroup) return reply("*🚫 This command can only be used in groups.*");
-  if (!isAdmins) return reply("*🔒 Only group admins can use this command.*");
+  if (!isGroup) return reply("*This command can only be used in groups.*");
+  if (!isAdmins) return reply("*Only group admins can use this command.*");
 
+  // Filter only participants whose IDs look like phone numbers (digits only, length 9 to 15)
   let validParticipants = participants.filter(p => {
     const number = p.id.split("@")[0];
     return /^\d{9,15}$/.test(number);
   });
 
   if (validParticipants.length === 0) {
-    return reply("*❗ No valid members found to tag.*");
+    return reply("*No valid phone numbers found to tag.*");
   }
 
-  const mentions = validParticipants.map(p => p.id);
-  const displayTags = validParticipants.map(p => `@${p.id.split("@")[0]}`);
+  let mentions = validParticipants.map(p => p.id);
 
-  let lines = [];
-  const chunkSize = 5;
-  for (let i = 0; i < displayTags.length; i += chunkSize) {
-    lines.push(displayTags.slice(i, i + chunkSize).join(" "));
-  }
+  let text = "*Attention everyone:*\n";
 
-  const text = `
-╭───────✧📢 TAG ALL 📢✧───────╮
-│  *Attention everyone!*  
-│  
-${lines.map(line => "│  " + line).join("\n")}
-│  
-╰────────────────────────────╯
-  `.trim();
+  // Format for display with @ without +
+  let displayNumbers = validParticipants.map(p => {
+    const number = p.id.split("@")[0];
+    return `@${number}`;
+  });
+
+  text += displayNumbers.join(" ");
 
   return reply(text, { mentions });
 });
