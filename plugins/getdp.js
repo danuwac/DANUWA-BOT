@@ -11,29 +11,34 @@ cmd({
 }, async (robin, mek, m, { reply, args, quoted }) => {
   try {
     let target;
-    const botJid = jidNormalizedUser(robin.user.id); // Bot's JID
+    const botJid = jidNormalizedUser(robin.user.id);
+    const isGroup = mek.key.remoteJid.endsWith('@g.us');
+
     const mentioned = mek.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+    const quotedSender = quoted?.sender || quoted?.key?.participant;
 
     if (mentioned) {
       target = mentioned;
-    } else if (quoted?.sender || quoted?.key?.participant) {
-      target = quoted.sender || quoted.key.participant;
+    } else if (quotedSender) {
+      target = quotedSender;
     } else if (args[0] && /^\d{5,15}$/.test(args[0])) {
-      target = args[0].replace(/[^0-9]/g, "") + "@s.whatsapp.net";
+      target = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
     } else {
-      const sender = mek.key.fromMe
-        ? mek.key.remoteJid
-        : mek.key.participant || mek.key.remoteJid;
-
-      const normalized = jidNormalizedUser(sender);
-
-      if (normalized === botJid) {
-        return reply("❌ Cannot fetch my own profile picture.\nUse `.getdp <number>` or reply to a user.");
+      if (isGroup) {
+        // fallback to sender in group
+        const sender = mek.key.fromMe ? mek.key.remoteJid : (mek.key.participant || mek.key.remoteJid);
+        target = jidNormalizedUser(sender);
+      } else {
+        // fallback to other user in private chat
+        target = mek.key.remoteJid;
       }
-      target = normalized;
     }
 
-    const url = await robin.profilePictureUrl(target, "image").catch(() => null);
+    if (target === botJid) {
+      return reply('❌ Cannot fetch my own profile picture.\nUse `.getdp <number>` or reply to a user.');
+    }
+
+    const url = await robin.profilePictureUrl(target, 'image').catch(() => null);
     if (!url) return reply("❌ Couldn't fetch profile picture. Maybe they don't have one or it's restricted.");
 
     await robin.sendMessage(m.chat, {
@@ -43,7 +48,7 @@ cmd({
     }, { quoted: mek });
 
   } catch (err) {
-    console.error("GetDP Error:", err);
-    reply("⚠️ Error fetching profile picture.");
+    console.error('GetDP Error:', err);
+    reply('⚠️ Error fetching profile picture.');
   }
 });
