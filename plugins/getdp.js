@@ -1,4 +1,5 @@
 const { cmd } = require('../command');
+const { jidNormalizedUser } = require('@whiskeysockets/baileys');
 
 cmd({
   pattern: "getdp",
@@ -12,17 +13,29 @@ cmd({
     let target;
 
     const mentionedJid = mek.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+
     if (mentionedJid) {
       target = mentionedJid;
+
     } else if (quoted?.sender) {
       target = quoted.sender;
+
     } else if (args[0] && /^\d{5,15}$/.test(args[0])) {
       target = args[0].replace(/[^0-9]/g, "") + "@s.whatsapp.net";
+
     } else if (!isGroup) {
-      // In private chat, target is the user you're chatting with
-      target = mek.key.remoteJid;
+      // In private chat, get the chat user's ID (not the bot's)
+      const sender = mek.key.remoteJid;
+      const botId = jidNormalizedUser(robin.user.id);
+
+      if (sender !== botId) {
+        target = sender;
+      } else {
+        return reply("❌ Cannot fetch my own DP. Try using `.getdp <number>` or reply to a user.");
+      }
+
     } else {
-      return reply("❌ In group: reply, mention or provide number.\nIn private chat: just send `.getdp`.");
+      return reply("❌ In group: reply, mention or provide number.\nIn private: use `.getdp` or `.getdp <number>`.");
     }
 
     const url = await robin.profilePictureUrl(target, "image").catch(() => null);
