@@ -226,7 +226,19 @@ async function connectToWA() {
     const body = type === 'conversation'
       ? mek.message.conversation
       : mek.message[type]?.text || mek.message[type]?.caption || '';
-    if (isGroup && global.antiLinkGroups?.[from] && !isAdmins && /(https?:\/\/[^\s]+)/i.test(body)) {
+
+    const isCmd = body.startsWith(prefix);
+    const commandName = isCmd ? body.slice(prefix.length).trim().split(" ")[0].toLowerCase() : '';
+    const args = body.trim().split(/ +/).slice(1);
+    const q = args.join(' ');
+
+    const sender = mek.key.fromMe 
+      ? (conn.user.id.split(':')[0]+'@s.whatsapp.net' || conn.user.id) 
+      : (mek.key.participant || mek.key.remoteJid);
+
+    const senderNumber = sender.split('@')[0];
+    const isGroup = from.endsWith('@g.us');
+        if (isGroup && global.antiLinkGroups?.[from] && !isAdmins && /(https?:\/\/[^\s]+)/i.test(body)) {
       await conn.sendMessage(from, {
         text: `🚫 Link detected!\n@${senderNumber} has been removed from *${groupName}*!`,
         mentions: [sender]
@@ -243,18 +255,6 @@ async function connectToWA() {
         await conn.groupParticipantsUpdate(from, [sender], "remove");
       }
     }
-
-    const isCmd = body.startsWith(prefix);
-    const commandName = isCmd ? body.slice(prefix.length).trim().split(" ")[0].toLowerCase() : '';
-    const args = body.trim().split(/ +/).slice(1);
-    const q = args.join(' ');
-
-    const sender = mek.key.fromMe 
-      ? (conn.user.id.split(':')[0]+'@s.whatsapp.net' || conn.user.id) 
-      : (mek.key.participant || mek.key.remoteJid);
-
-    const senderNumber = sender.split('@')[0];
-    const isGroup = from.endsWith('@g.us');
     const botNumber = conn.user.id.split(':')[0];
     const pushname = mek.pushName || 'Sin Nombre';
     const isMe = botNumber.includes(senderNumber);
