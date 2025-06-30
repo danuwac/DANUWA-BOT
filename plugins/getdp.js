@@ -21,7 +21,7 @@ cmd({
       const number = args[0].replace(/[^0-9]/g, "");
       target = number + "@s.whatsapp.net";
     } else {
-      return reply("❌ Please mention a user, reply to a message, or provide a valid number.");
+      return reply("❌ Please mention a user, reply to their message, or provide a valid number.");
     }
 
     const url = await robin.profilePictureUrl(target, "image").catch(() => null);
