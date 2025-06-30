@@ -42,30 +42,35 @@ cmd({
   category: "group",
   filename: __filename,
 }, async (robin, mek, m, { isGroup, isAdmins, reply, participants }) => {
-  if (!isGroup) return reply("*This command can only be used in groups.*");
-  if (!isAdmins) return reply("*Only group admins can use this command.*");
+  if (!isGroup) return reply("*🚫 This command can only be used in groups.*");
+  if (!isAdmins) return reply("*🔒 Only group admins can use this command.*");
 
-  // Filter only participants whose IDs look like phone numbers (digits only, length 9 to 15)
   let validParticipants = participants.filter(p => {
     const number = p.id.split("@")[0];
     return /^\d{9,15}$/.test(number);
   });
 
   if (validParticipants.length === 0) {
-    return reply("*No valid phone numbers found to tag.*");
+    return reply("*❗ No valid members found to tag.*");
   }
 
-  let mentions = validParticipants.map(p => p.id);
+  const mentions = validParticipants.map(p => p.id);
+  const displayTags = validParticipants.map(p => `@${p.id.split("@")[0]}`);
 
-  let text = "*Attention everyone:*\n";
+  let lines = [];
+  const chunkSize = 5;
+  for (let i = 0; i < displayTags.length; i += chunkSize) {
+    lines.push(displayTags.slice(i, i + chunkSize).join(" "));
+  }
 
-  // Format for display with + prefix
-  let displayNumbers = validParticipants.map(p => {
-    const number = p.id.split("@")[0];
-    return `@+${number}`;
-  });
-
-  text += displayNumbers.join(" ");
+  const text = `
+╭───────✧📢 TAG ALL 📢✧───────╮
+│  *Attention everyone!*  
+│  
+${lines.map(line => "│  " + line).join("\n")}
+│  
+╰────────────────────────────╯
+  `.trim();
 
   return reply(text, { mentions });
 });
@@ -100,9 +105,11 @@ cmd({
 }, async (robin, mek, m, { isGroup, reply, participants }) => {
   if (!isGroup) return reply("*This command is for groups only.*");
 
-  const admins = participants.filter(p => p.admin).map(p => `@${p.id.split("@")[0]}`).join("\n");
+  const admins = participants.filter(p => p.admin).map(p => `@${p.id.split("@")[0]}`).join(`
+`);
 
-  return reply(`*Group Admins:*\n${admins}`, { mentions: participants.filter(p => p.admin).map(a => a.id) });
+  return reply(`*Group Admins:*
+${admins}`, { mentions: participants.filter(p => p.admin).map(a => a.id) });
 });
 
 cmd({
@@ -253,7 +260,8 @@ cmd({
     return reply("*Group only & I must be an admin.*");
 
   const code = await robin.groupInviteCode(m.chat);
-  return reply(`*Group Link:*\nhttps://chat.whatsapp.com/${code}`);
+  return reply(`*Group Link:*
+https://chat.whatsapp.com/${code}`);
 });
 
 cmd({
@@ -304,13 +312,20 @@ cmd({
   const owner = metadata.owner || metadata.participants.find(p => p.admin === 'superadmin')?.id;
   const desc = metadata.desc || "No description.";
 
-  let txt = `*👥 Group:* ${metadata.subject}\n`;
-  txt += `*🆔 ID:* ${metadata.id}\n`;
-  txt += `*🧑‍💼 Owner:* ${owner ? `@${owner.split("@")[0]}` : "Not found"}\n`;
-  txt += `*📅 Created:* ${creation}\n`;
-  txt += `*👤 Members:* ${metadata.participants.length}\n`;
-  txt += `*🛡️ Admins:* ${adminsCount}\n`;
-  txt += `*📝 Description:*\n${desc}`;
+  let txt = `*👥 Group:* ${metadata.subject}
+`;
+  txt += `*🆔 ID:* ${metadata.id}
+`;
+  txt += `*🧑‍💼 Owner:* ${owner ? `@${owner.split("@")[0]}` : "Not found"}
+`;
+  txt += `*📅 Created:* ${creation}
+`;
+  txt += `*👤 Members:* ${metadata.participants.length}
+`;
+  txt += `*🛡️ Admins:* ${adminsCount}
+`;
+  txt += `*📝 Description:*
+${desc}`;
 
   return reply(txt, { mentions: owner ? [owner] : [] });
 });
