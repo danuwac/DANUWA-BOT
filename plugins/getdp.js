@@ -12,43 +12,34 @@ cmd({
   try {
     let target;
     const botJid = jidNormalizedUser(robin.user.id);
-    const isGroup = mek.key.remoteJid.endsWith('@g.us');
-
     const mentioned = mek.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
-    const quotedSender = quoted?.sender || quoted?.key?.participant;
 
     if (mentioned) {
       target = mentioned;
-    } else if (quotedSender) {
-      target = quotedSender;
+    } else if (quoted?.sender) {
+      target = quoted.sender;
     } else if (args[0] && /^\d{5,15}$/.test(args[0])) {
-      target = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+      target = args[0].replace(/[^0-9]/g, "") + "@s.whatsapp.net";
     } else {
-      if (isGroup) {
-        // fallback to sender in group
-        const sender = mek.key.fromMe ? mek.key.remoteJid : (mek.key.participant || mek.key.remoteJid);
-        target = jidNormalizedUser(sender);
-      } else {
-        // fallback to other user in private chat
-        target = mek.key.remoteJid;
-      }
+      return reply("❌ Please mention a user, reply to their message, or provide a valid number.");
     }
 
-    if (target === botJid) {
-      return reply('❌ Cannot fetch my own profile picture.\nUse `.getdp <number>` or reply to a user.');
+    const normalized = jidNormalizedUser(target);
+    if (normalized === botJid) {
+      return reply("❌ I cannot fetch my own profile picture.");
     }
 
-    const url = await robin.profilePictureUrl(target, 'image').catch(() => null);
+    const url = await robin.profilePictureUrl(normalized, "image").catch(() => null);
     if (!url) return reply("❌ Couldn't fetch profile picture. Maybe they don't have one or it's restricted.");
 
     await robin.sendMessage(m.chat, {
       image: { url },
-      caption: `🖼️ Profile picture of @${target.split("@")[0]}`,
-      mentions: [target]
+      caption: `🖼️ Profile picture of @${normalized.split("@")[0]}`,
+      mentions: [normalized]
     }, { quoted: mek });
 
   } catch (err) {
-    console.error('GetDP Error:', err);
-    reply('⚠️ Error fetching profile picture.');
+    console.error("GetDP Error:", err);
+    reply("⚠️ Error fetching profile picture.");
   }
 });
