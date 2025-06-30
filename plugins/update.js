@@ -12,7 +12,7 @@ cmd({
     desc: "Update the bot to the latest version.",
     category: "misc",
     filename: __filename
-}, async (conn, mek, m, { from, quoted, reply, args }) => { 
+}, async (conn, mek, m, { from, quoted, reply, args, isOwner }) => { 
     if (!isOwner) return reply("This command is only for the bot owner.");
 
     try {
