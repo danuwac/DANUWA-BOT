@@ -1,39 +1,49 @@
 const { cmd } = require('../command');
-const { getBuffer } = require('../lib/functions');
+const { jidNormalizedUser } = require('@whiskeysockets/baileys');
 
 cmd({
   pattern: "getdp",
   alias: ["dp", "profilepic"],
-  desc: "Get user's profile picture",
-  category: "tools",
   react: "🖼️",
+  desc: "Download user's profile picture",
+  category: "utility",
   filename: __filename
-}, async (conn, m, mdata) => {
-  const { args, sender, reply, isGroup, quoted, q } = mdata;
-
-  let targetJid;
-
-  if (q) {
-    // If .getdp 9471xxxxxxx
-    let number = q.replace(/[^0-9]/g, '');
-    if (number.length < 7) return reply("❌ Invalid number.");
-    targetJid = number + '@s.whatsapp.net';
-  } else if (quoted) {
-    // If replied to someone in group
-    targetJid = quoted.participant || quoted.key?.participant || quoted.key?.remoteJid;
-  } else if (!isGroup) {
-    // In private chat, use sender's jid
-    targetJid = sender;
-  } else {
-    return reply("❗ Reply to a message or provide a number.");
-  }
-
+}, async (robin, mek, m, { reply, args, quoted }) => {
   try {
-    const ppUrl = await conn.profilePictureUrl(targetJid, 'image');
-    const buffer = await getBuffer(ppUrl);
-    await conn.sendMessage(mdata.from, { image: buffer, caption: `📷 Profile picture of: ${targetJid.split("@")[0]}` }, { quoted: m });
-  } catch (e) {
-    console.log("DP fetch error:", e);
-    return reply("❌ Couldn't fetch profile picture (maybe user has no DP or it's restricted).");
+    let target;
+    const botJid = jidNormalizedUser(robin.user.id); // Bot's JID
+    const mentioned = mek.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
+
+    if (mentioned) {
+      target = mentioned;
+    } else if (quoted?.sender || quoted?.key?.participant) {
+      target = quoted.sender || quoted.key.participant;
+    } else if (args[0] && /^\d{5,15}$/.test(args[0])) {
+      target = args[0].replace(/[^0-9]/g, "") + "@s.whatsapp.net";
+    } else {
+      const sender = mek.key.fromMe
+        ? mek.key.remoteJid
+        : mek.key.participant || mek.key.remoteJid;
+
+      const normalized = jidNormalizedUser(sender);
+
+      if (normalized === botJid) {
+        return reply("❌ Cannot fetch my own profile picture.\nUse `.getdp <number>` or reply to a user.");
+      }
+      target = normalized;
+    }
+
+    const url = await robin.profilePictureUrl(target, "image").catch(() => null);
+    if (!url) return reply("❌ Couldn't fetch profile picture. Maybe they don't have one or it's restricted.");
+
+    await robin.sendMessage(m.chat, {
+      image: { url },
+      caption: `🖼️ Profile picture of @${target.split("@")[0]}`,
+      mentions: [target]
+    }, { quoted: mek });
+
+  } catch (err) {
+    console.error("GetDP Error:", err);
+    reply("⚠️ Error fetching profile picture.");
   }
 });
