@@ -4,28 +4,29 @@ cmd({
   pattern: "getdp",
   alias: ["dp", "profilepic"],
   react: "🖼️",
-  desc: "Download someone else's profile picture (DP)",
+  desc: "Download user's profile picture",
   category: "utility",
   filename: __filename
-}, async (robin, mek, m, { isGroup, reply, quoted }) => {
+}, async (robin, mek, m, { reply, args, quoted, isGroup }) => {
   try {
     let target;
 
-    // Try to get mentioned JID
     const mentionedJid = mek.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0];
     if (mentionedJid) {
       target = mentionedJid;
-    } 
-    // Try to get replied user
-    else if (quoted?.sender) {
+    } else if (quoted?.sender) {
       target = quoted.sender;
-    } 
-    else {
-      return reply("❌ Mention or reply to a user to fetch their profile picture.");
+    } else if (args[0] && /^\d{5,15}$/.test(args[0])) {
+      target = args[0].replace(/[^0-9]/g, "") + "@s.whatsapp.net";
+    } else if (!isGroup) {
+      // In private chat, target is the user you're chatting with
+      target = mek.key.remoteJid;
+    } else {
+      return reply("❌ In group: reply, mention or provide number.\nIn private chat: just send `.getdp`.");
     }
 
     const url = await robin.profilePictureUrl(target, "image").catch(() => null);
-    if (!url) return reply("❌ Couldn't fetch profile picture. Maybe they don't have one or it's private.");
+    if (!url) return reply("❌ Couldn't fetch profile picture. They might not have one or it's private.");
 
     await robin.sendMessage(m.chat, {
       image: { url },
@@ -34,7 +35,7 @@ cmd({
     }, { quoted: mek });
 
   } catch (err) {
-    console.error("DP Fetch Error:", err);
+    console.error("GetDP Error:", err);
     reply("⚠️ Error fetching profile picture.");
   }
 });
