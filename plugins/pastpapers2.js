@@ -84,9 +84,9 @@ cmd(
     if (subject && subjectAliases[subject]) {
       subject = subjectAliases[subject];
     }
-
-    const gradeSlug = `grade-${grade}${subject ? "-" + subject : ""}`;
-
+    const gradeSlug = subject
+      ? `grade-${grade}/${subject}`
+      : `grade-${grade}`;
     const posts = await fetchGovdocPosts(gradeSlug);
     if (!posts.length) return reply(`❌ No papers found for *${gradeSlug}*`);
 
