@@ -34,7 +34,7 @@ async function fetchSubjectPapers(subjectSlug) {
 // Step 1: .pastpapers biology
 cmd(
   {
-    pattern: "pastpapers",
+    pattern: "pastol",
     react: "📄",
     desc: "Get A/L past papers by subject from govdoc.lk",
     category: "education",
