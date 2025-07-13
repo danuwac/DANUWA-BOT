@@ -12,29 +12,24 @@ cmd(
     const message = {
       text: "📘 *GovDoc.lk Exam Resources*\n\nChoose an option below:",
       footer: "Powered by Danuwa MD",
-      templateButtons: [
+      buttons: [
         {
-          index: 1,
-          quickReplyButton: {
-            displayText: "📚 Term Test (Grade 6–13)",
-            id: ".termtest",
-          },
+          buttonId: ".termtest",
+          buttonText: { displayText: "📚 Term Test (Grade 6–13)" },
+          type: 1
         },
         {
-          index: 2,
-          quickReplyButton: {
-            displayText: "📄 O/L Past Papers",
-            id: ".olpast",
-          },
+          buttonId: ".olpast",
+          buttonText: { displayText: "📄 O/L Past Papers" },
+          type: 1
         },
         {
-          index: 3,
-          quickReplyButton: {
-            displayText: "📄 A/L Past Papers",
-            id: ".alpast",
-          },
-        },
+          buttonId: ".alpast",
+          buttonText: { displayText: "📄 A/L Past Papers" },
+          type: 1
+        }
       ],
+      headerType: 1
     };
 
     await robin.sendMessage(from, message, { quoted: mek });
