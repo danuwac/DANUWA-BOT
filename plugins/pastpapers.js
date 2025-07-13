@@ -7,20 +7,28 @@ const headers = {
   'Accept-Language': 'en-US,en;q=0.9',
 };
 
-async function fetchValidTermLinks(query) {
+async function fetchThirdTermPapers(query) {
   try {
-    const cleanQuery = query.trim().toLowerCase().replace(/\s+/g, '-');
-    const url = `https://pastpapers.wiki/${cleanQuery}-term-test-papers/`;
+    const slug = query.trim().toLowerCase().replace(/\s+/g, '-');
+    const url = `https://pastpapers.wiki/${slug}-term-test-papers/`;
     const res = await axios.get(url, { headers });
     const $ = cheerio.load(res.data);
 
-    const results = [];
-    $('ul li a').each((_, el) => {
-      const title = $(el).text().trim();
-      const href = $(el).attr('href');
-      if (title && href && href.includes("term-test")) {
-        results.push({ title, url: href });
+    let thirdTermSection;
+    $('h4').each((_, h) => {
+      const text = $(h).text().toLowerCase();
+      if (text.includes("3rd term")) {
+        thirdTermSection = $(h).parent().next().find('ul li a');
       }
+    });
+
+    if (!thirdTermSection || !thirdTermSection.length) return [];
+
+    const results = [];
+    thirdTermSection.each((_, a) => {
+      const title = $(a).text().trim();
+      const link = $(a).attr('href');
+      if (title && link) results.push({ title, link });
     });
 
     return results;
@@ -32,27 +40,26 @@ async function fetchValidTermLinks(query) {
 
 cmd({
   pattern: 'termtest',
-  alias: ['pastpaper', 'papers'],
-  use: '.termtest grade 13 biology',
-  desc: 'Download Sri Lankan term test papers',
+  alias: ['thirdterm', 'paper3'],
+  use: '.termtest grade 11 english',
+  desc: 'Download 3rd Term Test past papers',
   category: 'education',
   filename: __filename
 }, async (conn, mek, m, { from, q, reply }) => {
-  if (!q) return reply("📚 Please enter something like `.termtest grade 13 biology`");
+  if (!q) return reply('📚 Please enter something like `.termtest grade 11 english`');
+  await m.react("📘");
 
-  await m.react("🔍");
+  const papers = await fetchThirdTermPapers(q);
+  if (!papers.length) return reply("❌ No 3rd term papers found for your query.");
 
-  const papers = await fetchValidTermLinks(q);
-  if (!papers.length) return reply("❌ No term test papers found for this subject.");
-
-  let msg = `📚 *TERM TEST PAPERS FOUND*\n──────────────────────\n_Reply with the number to download_\n\n`;
+  let msg = `📘 *3rd TERM TEST PAPERS*\n──────────────────────\n_Reply with number to download_\n\n`;
   papers.forEach((p, i) => {
     msg += `*${i + 1}.* ${p.title}\n`;
   });
 
   const sent = await conn.sendMessage(from, { text: msg }, { quoted: mek });
 
-  conn.ev.on("messages.upsert", async (msgUpdate) => {
+  conn.ev.on('messages.upsert', async (msgUpdate) => {
     const msg1 = msgUpdate.messages[0];
     if (!msg1.message?.extendedTextMessage) return;
 
@@ -62,13 +69,13 @@ cmd({
 
     if (!isReply || selected < 0 || selected >= papers.length) return;
 
-    await conn.sendMessage(from, { react: { text: "📥", key: msg1.key } });
+    await conn.sendMessage(from, { react: { text: "⬇️", key: msg1.key } });
 
     await conn.sendMessage(from, {
-      document: { url: papers[selected].url },
+      document: { url: papers[selected].link },
       mimetype: "application/pdf",
       fileName: `${papers[selected].title}.pdf`,
-      caption: `✅ *${papers[selected].title}*\n📄 Term test paper sent successfully.`,
+      caption: `✅ *${papers[selected].title}*\n📄 3rd Term paper sent successfully.`,
     }, { quoted: msg1 });
 
     await conn.sendMessage(from, { react: { text: "✅", key: msg1.key } });
