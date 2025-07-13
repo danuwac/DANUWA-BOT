@@ -1,8 +1,6 @@
 const { cmd } = require("../command");
 const axios = require("axios");
 const cheerio = require("cheerio");
-const fs = require("fs");
-const path = require("path");
 
 const headers = {
   "User-Agent": "Mozilla/5.0",
@@ -28,7 +26,6 @@ async function fetchGovdocPosts(gradeSlug) {
   return posts.slice(0, 20);
 }
 
-// .govdoc grade 11
 cmd(
   {
     pattern: "govdoc",
@@ -61,7 +58,7 @@ cmd(
   }
 );
 
-// Step 2: select paper number
+// Step 2: Select paper
 cmd(
   {
     filter: (text, { sender }) =>
@@ -82,10 +79,10 @@ cmd(
       const $ = cheerio.load(data);
 
       const languages = [];
-      $(".btn-row a").each((_, el) => {
+      $("a[href*='/view?id=']").each((_, el) => {
         const lang = $(el).find("button").text().trim();
         const href = $(el).attr("href");
-        if (lang && href && href.includes("/view?id=")) {
+        if (lang && href) {
           languages.push({
             lang,
             link: href.startsWith("http") ? href : `https://govdoc.lk${href}`,
@@ -120,7 +117,7 @@ cmd(
   }
 );
 
-// Step 3: download PDF buffer and send
+// Step 3: Download PDF
 cmd(
   {
     filter: (text, { sender }) =>
@@ -137,34 +134,27 @@ cmd(
     const lang = pending.languages[selected - 1];
 
     try {
-      const { data: langPageData } = await axios.get(lang.link, { headers });
-      const $ = cheerio.load(langPageData);
+      const { data: langPage } = await axios.get(lang.link, { headers });
+      const $ = cheerio.load(langPage);
 
-      const downloadLinks = [];
-      $("a").each((_, el) => {
-        const href = $(el).attr("href");
-        if (href && href.includes("/download/")) {
-          downloadLinks.push(href);
-        }
-      });
+      // Find the real download button link
+      const downloadBtn = $('a.btn.w-100[href*="/download/"]').attr("href");
 
-      if (!downloadLinks.length) throw new Error("Download link not found");
+      if (!downloadBtn) throw new Error("Download link not found");
 
-      let rawUrl = downloadLinks[0].startsWith("http")
-        ? downloadLinks[0]
-        : `https://govdoc.lk${downloadLinks[0]}`;
+      const rawUrl = downloadBtn.startsWith("http")
+        ? downloadBtn
+        : `https://govdoc.lk${downloadBtn}`;
 
-      // Convert Google Drive link if needed
-      const match = rawUrl.match(/\/file\/d\/([^/]+)\//);
-      if (match) {
-        rawUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`;
-      }
-
-      // Download PDF as buffer
       const response = await axios.get(rawUrl, {
         headers,
         responseType: "arraybuffer",
       });
+
+      const contentType = response.headers["content-type"];
+      if (!contentType.includes("pdf")) {
+        throw new Error("Not a PDF file. Got: " + contentType);
+      }
 
       const pdfBuffer = Buffer.from(response.data);
       const fileName = `${pending.selected.title} - ${lang.lang}.pdf`;
@@ -181,8 +171,8 @@ cmd(
 
       delete pendingGovDoc[sender];
     } catch (e) {
-      console.error("PDF download failed:", e.message);
-      reply("⚠️ Failed to download or send PDF. It might not be public or is too large.");
+      console.error("Download failed:", e.message);
+      reply("⚠️ Failed to download or send PDF. It may not be public or available.");
       delete pendingGovDoc[sender];
     }
   }
