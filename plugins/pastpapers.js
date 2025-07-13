@@ -1,116 +1,197 @@
-const { cmd } = require('../command');
-const axios = require('axios');
-const cheerio = require('cheerio');
+const { cmd } = require("../command");
+const axios = require("axios");
+const cheerio = require("cheerio");
+const puppeteer = require("puppeteer");
+const fs = require("fs");
+const path = require("path");
+const os = require("os");
 
 const headers = {
-  'User-Agent': 'Mozilla/5.0',
-  'Accept-Language': 'en-US,en;q=0.9',
+  "User-Agent": "Mozilla/5.0",
+  "Accept-Language": "en-US,en;q=0.9",
 };
 
-async function getEkalviPosts(baseUrl, filter) {
-  const res = await axios.get(baseUrl, { headers });
+const pendingPastPapers = {};
+
+// Step 1: Fetch from general past papers page
+async function fetchPastPapers() {
+  const url = `https://govdoc.lk/category/past-papers`;
+  const res = await axios.get(url, { headers });
   const $ = cheerio.load(res.data);
   const posts = [];
 
-  $('article').each((_, el) => {
-    const link = $(el).find('a').first().attr('href');
-    const title = $(el).find('.entry-title a').text().trim();
-    if (link && title) {
-      if (!filter || title.toLowerCase().includes(filter.toLowerCase())) {
-        posts.push({ title, link });
-      }
-    }
+  $("a.custom-card").each((_, el) => {
+    // Exclude "Related Pages" section
+    if ($(el).closest(".info-body").length > 0) return;
+
+    const link = $(el).attr("href");
+    const title = $(el).find("h5.cate-title").text().trim();
+    if (link && title) posts.push({ title, link });
   });
 
-  return posts.slice(0, 20); // return latest 20 posts
+  return posts.slice(0, 20);
 }
 
-async function extractGoogleDriveLinks(postUrl) {
-  const res = await axios.get(postUrl, { headers });
-  const $ = cheerio.load(res.data);
-  const pdfs = [];
+// Step 1: .pastpapers
+cmd(
+  {
+    pattern: "pastpapers",
+    react: "📄",
+    desc: "Get past papers from govdoc.lk",
+    category: "education",
+    filename: __filename,
+  },
+  async (robin, mek, m, { from, sender, reply }) => {
+    await m.react("📄");
 
-  $('blockquote a').each((_, el) => {
-    const href = $(el).attr('href');
-    const text = $(el).text().trim();
-    if (href && href.includes('drive.google.com')) {
-      pdfs.push({ name: text || "Download PDF", url: href });
+    const posts = await fetchPastPapers();
+    if (!posts.length) return reply("❌ No past papers found.");
+
+    let msg = `📄 *GovDoc Past Papers*\n────────────────────\n_Reply with number to select paper_\n\n`;
+    posts.forEach((post, i) => {
+      msg += `*${i + 1}.* ${post.title}\n`;
+    });
+
+    await robin.sendMessage(from, { text: msg }, { quoted: mek });
+
+    pendingPastPapers[sender] = {
+      step: "select",
+      results: posts,
+      quoted: mek,
+    };
+  }
+);
+
+// Step 2: User selects paper
+cmd(
+  {
+    filter: (text, { sender }) =>
+      pendingPastPapers[sender] && pendingPastPapers[sender].step === "select" && /^\d+$/.test(text.trim()),
+  },
+  async (robin, mek, m, { from, body, sender, reply }) => {
+    const pending = pendingPastPapers[sender];
+    const selected = parseInt(body.trim());
+
+    if (selected < 1 || selected > pending.results.length) {
+      return reply("❌ Invalid selection. Please reply with a valid number.");
     }
-  });
 
-  return pdfs;
-}
+    const selectedResult = pending.results[selected - 1];
 
-async function handleCommand(conn, mek, m, from, commandType, query) {
-  const base = commandType === 'ol'
-    ? 'https://e-kalvi.com/category/sinhala-medium/o-l/'
-    : 'https://e-kalvi.com/category/sinhala-medium/a-l-sinhala-medium/';
+    try {
+      const { data } = await axios.get(selectedResult.link, { headers });
+      const $ = cheerio.load(data);
 
-  const posts = await getEkalviPosts(base, query);
-  if (!posts.length) return m.reply('❌ No posts found for that category/language.');
-
-  let msg = `📘 *E-KALVI ${commandType.toUpperCase()} PAPERS*\n────────────────────\n_Reply with number to download_\n\n`;
-  posts.forEach((p, i) => {
-    msg += `*${i + 1}.* ${p.title}\n`;
-  });
-
-  const sent = await conn.sendMessage(from, { text: msg }, { quoted: mek });
-
-  conn.ev.on("messages.upsert", async (msgUpdate) => {
-    const msg1 = msgUpdate.messages[0];
-    if (!msg1.message?.extendedTextMessage) return;
-
-    const text = msg1.message.extendedTextMessage.text.trim();
-    const isReply = msg1.message.extendedTextMessage.contextInfo?.stanzaId === sent.key.id;
-    const selected = parseInt(text) - 1;
-
-    if (!isReply || isNaN(selected) || selected < 0 || selected >= posts.length) return;
-
-    const post = posts[selected];
-    await conn.sendMessage(from, { react: { text: "⏳", key: msg1.key } });
-
-    const files = await extractGoogleDriveLinks(post.link);
-    if (!files.length) {
-      await conn.sendMessage(from, {
-        text: `❌ No download links found in *${post.title}*`,
-        quoted: msg1
+      const languages = [];
+      $("a[href*='/view?id=']").each((_, el) => {
+        const lang = $(el).find("button").text().trim();
+        const href = $(el).attr("href");
+        if (lang && href) {
+          languages.push({
+            lang,
+            link: href.startsWith("http") ? href : `https://govdoc.lk${href}`,
+          });
+        }
       });
-      return;
+
+      if (!languages.length) {
+        delete pendingPastPapers[sender];
+        return reply("⚠️ No language options found for this paper.");
+      }
+
+      let langMsg = `🌐 *Available Languages for:* _${selectedResult.title}_\n\n`;
+      languages.forEach((l, i) => {
+        langMsg += `*${i + 1}.* ${l.lang}\n`;
+      });
+      langMsg += `\n_Reply with a number (1-${languages.length}) to download._`;
+
+      pendingPastPapers[sender] = {
+        step: "download",
+        selected: selectedResult,
+        languages,
+        quoted: mek,
+      };
+
+      reply(langMsg);
+    } catch (e) {
+      console.error(e);
+      reply("⚠️ Failed to fetch language options. Please try again.");
+      delete pendingPastPapers[sender];
+    }
+  }
+);
+
+// Step 3: Puppeteer file download
+cmd(
+  {
+    filter: (text, { sender }) =>
+      pendingPastPapers[sender] && pendingPastPapers[sender].step === "download" && /^\d+$/.test(text.trim()),
+  },
+  async (robin, mek, m, { from, body, sender, reply }) => {
+    const pending = pendingPastPapers[sender];
+    const selected = parseInt(body.trim());
+
+    if (selected < 1 || selected > pending.languages.length) {
+      return reply("❌ Invalid selection. Please reply with a valid number.");
     }
 
-    for (const pdf of files) {
-      await conn.sendMessage(from, {
-        document: { url: pdf.url },
-        mimetype: "application/pdf",
-        fileName: `${pdf.name}.pdf`,
-        caption: `✅ *${post.title}*\n📄 ${pdf.name}`,
-      }, { quoted: msg1 });
+    const lang = pending.languages[selected - 1];
+    const downloadDir = path.join(os.tmpdir(), `pastpapers-${Date.now()}`);
+
+    try {
+      fs.mkdirSync(downloadDir);
+
+      const browser = await puppeteer.launch({
+        headless: "new",
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      });
+
+      const page = await browser.newPage();
+      await page._client().send("Page.setDownloadBehavior", {
+        behavior: "allow",
+        downloadPath: downloadDir,
+      });
+
+      await page.goto(lang.link, { waitUntil: "networkidle2", timeout: 30000 });
+      await page.waitForSelector('a.btn.w-100[href*="/download/"]', { timeout: 15000 });
+      await page.click('a.btn.w-100[href*="/download/"]');
+
+      // Wait up to 20 seconds for file
+      let fileName;
+      for (let i = 0; i < 20; i++) {
+        const files = fs.readdirSync(downloadDir).filter(f => f.endsWith(".pdf"));
+        if (files.length > 0) {
+          fileName = files[0];
+          break;
+        }
+        await new Promise(res => setTimeout(res, 1000));
+      }
+
+      await browser.close();
+
+      if (!fileName) throw new Error("Download did not start in time.");
+
+      const filePath = path.join(downloadDir, fileName);
+      const pdfBuffer = fs.readFileSync(filePath);
+      const niceName = `${pending.selected.title} - ${lang.lang}.pdf`;
+
+      await robin.sendMessage(
+        from,
+        {
+          document: pdfBuffer,
+          mimetype: "application/pdf",
+          fileName: niceName,
+        },
+        { quoted: mek }
+      );
+
+      fs.unlinkSync(filePath);
+      fs.rmdirSync(downloadDir);
+      delete pendingPastPapers[sender];
+    } catch (e) {
+      console.error("❌ Puppeteer download failed:", e.message);
+      reply("⚠️ Failed to download PDF. It may have timed out or failed to start.");
+      delete pendingPastPapers[sender];
     }
-
-    await conn.sendMessage(from, { react: { text: "✅", key: msg1.key } });
-  });
-}
-
-// 🔹 .ekalviol (O/L)
-cmd({
-  pattern: 'ekalviol',
-  use: '.ekalviol [tamil|english|sinhala]',
-  desc: 'Get O/L past papers from e-kalvi.com',
-  category: 'education',
-  filename: __filename
-}, async (conn, mek, m, { from, q }) => {
-  await m.react('📘');
-  return handleCommand(conn, mek, m, from, 'ol', q);
-});
-
-// 🔹 .ekalvial (A/L)
-cmd({
-  pattern: 'ekalvial',
-  use: '.ekalvial [tamil|english|sinhala]',
-  desc: 'Get A/L past papers from e-kalvi.com',
-  category: 'education',
-  filename: __filename
-}, async (conn, mek, m, { from, q }) => {
-  await m.react('📘');
-  return handleCommand(conn, mek, m, from, 'al', q);
-});
+  }
+);
