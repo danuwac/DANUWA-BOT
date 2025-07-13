@@ -1,37 +1,31 @@
-const { cmd } = require("../command"); // adjust path based on your bot
+const { cmd } = require("../command");
 
 cmd(
   {
     pattern: "govdocmenu",
-    desc: "GovDoc main menu",
+    desc: "GovDoc.lk main menu",
     react: "📚",
     category: "education",
     filename: __filename,
   },
-  async (conn, mek, m, { from }) => {
-    const message = {
-      text: "📘 *GovDoc.lk Exam Resources*\n\nChoose a category below:",
-      footer: "Danuwa MD WhatsApp Bot",
-      buttons: [
+  async (robin, mek, m, { from }) => {
+    const listMessage = {
+      text: "📘 *GovDoc.lk Exam Resources*",
+      title: "Choose an Option",
+      buttonText: "View Options",
+      footer: "Powered by Danuwa MD",
+      sections: [
         {
-          buttonId: ".termtest",
-          buttonText: { displayText: "📚 Term Test (Grade 6–13)" },
-          type: 1,
-        },
-        {
-          buttonId: ".olpast",
-          buttonText: { displayText: "📄 O/L Past Papers" },
-          type: 1,
-        },
-        {
-          buttonId: ".alpast",
-          buttonText: { displayText: "📄 A/L Past Papers" },
-          type: 1,
-        },
-      ],
-      headerType: 1, // required!
+          title: "Exam Papers",
+          rows: [
+            { title: "📚 Term Test (Grade 6–13)", rowId: ".termtest" },
+            { title: "📄 O/L Past Papers", rowId: ".olpast" },
+            { title: "📄 A/L Past Papers", rowId: ".alpast" }
+          ]
+        }
+      ]
     };
 
-    await conn.sendMessage(from, message, { quoted: mek });
+    await robin.sendMessage(from, listMessage, { quoted: mek });
   }
 );
