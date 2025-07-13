@@ -55,23 +55,29 @@ cmd(
 
 _Reply with 1, 2, or 3 to continue._`;
 
-    await robin.sendMessage(from, { text: msg }, { quoted: mek });
+    const sent = await robin.sendMessage(from, { text: msg }, { quoted: mek });
 
+    // Save quoted message ID to match reply
     paperFlow[sender] = {
       step: "menu",
+      menuMsgId: sent.key.id,
       quoted: mek,
     };
   }
 );
 
-// Step 2: reply with 1–3
+// Step 2: handle reply to menu (must reply to same msg)
 cmd(
   {
-    filter: (text, { sender }) =>
-      paperFlow[sender] && paperFlow[sender].step === "menu" && /^[1-3]$/.test(text.trim()),
+    filter: (text, { sender, quotedMsg }) =>
+      paperFlow[sender] &&
+      paperFlow[sender].step === "menu" &&
+      /^[1-3]$/.test(text.trim()) &&
+      quotedMsg?.key?.id === paperFlow[sender]?.menuMsgId, // make sure it's a reply to menu
   },
   async (robin, mek, m, { sender, reply }) => {
     const option = parseInt(m.text.trim());
+
     if (option === 1) {
       reply("📥 Enter grade and subject (e.g., `10 ict`)");
       paperFlow[sender] = { step: "input", type: "term", quoted: mek };
@@ -81,10 +87,11 @@ cmd(
     } else if (option === 3) {
       reply("📥 Enter subject only (e.g., `biology`)");
       paperFlow[sender] = { step: "input", type: "al", quoted: mek };
+    } else {
+      reply("❌ Invalid selection.");
     }
   }
 );
-
 // Step 3: user inputs details
 cmd(
   {
