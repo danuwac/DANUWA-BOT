@@ -1,8 +1,7 @@
 const { cmd } = require("../command");
 const axios = require("axios");
 const cheerio = require("cheerio");
-const { wrapper } = require("axios-cookiejar-support");
-const tough = require("tough-cookie");
+const puppeteer = require("puppeteer");
 
 const headers = {
   "User-Agent": "Mozilla/5.0",
@@ -11,7 +10,7 @@ const headers = {
 
 const pendingGovDoc = {};
 
-// Step 1: Fetch paper list by grade
+// Step 1: Fetch posts
 async function fetchGovdocPosts(gradeSlug) {
   const url = `https://govdoc.lk/category/term-test-papers/${gradeSlug}`;
   const res = await axios.get(url, { headers });
@@ -19,7 +18,6 @@ async function fetchGovdocPosts(gradeSlug) {
   const posts = [];
 
   $("a.custom-card").each((_, el) => {
-    if ($(el).closest(".info-body").length > 0) return;
     const link = $(el).attr("href");
     const title = $(el).find("h5.cate-title").text().trim();
     if (link && title) posts.push({ title, link });
@@ -28,7 +26,7 @@ async function fetchGovdocPosts(gradeSlug) {
   return posts.slice(0, 20);
 }
 
-// Command: .govdoc grade 11
+// .govdoc grade 11
 cmd(
   {
     pattern: "govdoc",
@@ -120,7 +118,7 @@ cmd(
   }
 );
 
-// Step 3: Download the PDF with proper cookies and headers
+// Step 3: Download using Puppeteer
 cmd(
   {
     filter: (text, { sender }) =>
@@ -135,28 +133,29 @@ cmd(
     }
 
     const lang = pending.languages[selected - 1];
-    const jar = new tough.CookieJar();
-    const client = wrapper(axios.create({ jar }));
 
     try {
-      // Step 1: Visit view page to store cookies and get download link
-      const langPageResponse = await client.get(lang.link, { headers });
-      const $ = cheerio.load(langPageResponse.data);
+      const browser = await puppeteer.launch({
+        headless: "new",
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      });
 
-      const downloadPath = $('a.btn.w-100[href*="/download/"]').attr("href");
-      if (!downloadPath) throw new Error("Download link not found");
+      const page = await browser.newPage();
+      await page.goto(lang.link, { waitUntil: "networkidle2", timeout: 30000 });
 
-      const downloadUrl = downloadPath.startsWith("http")
-        ? downloadPath
-        : `https://govdoc.lk${downloadPath}`;
+      // Wait for the download button and extract the href
+      await page.waitForSelector('a.btn.w-100[href*="/download/"]', { timeout: 15000 });
+      const downloadUrl = await page.$eval('a.btn.w-100[href*="/download/"]', a =>
+        a.href.startsWith("http") ? a.href : `https://govdoc.lk${a.getAttribute("href")}`
+      );
 
-      // Step 2: Download PDF with Referer and cookies
-      const pdfResponse = await client.get(downloadUrl, {
+      // Download the file content from extracted downloadUrl
+      const pdfResponse = await axios.get(downloadUrl, {
+        responseType: "arraybuffer",
         headers: {
           ...headers,
           Referer: lang.link,
         },
-        responseType: "arraybuffer",
       });
 
       const contentType = pdfResponse.headers["content-type"];
@@ -177,10 +176,11 @@ cmd(
         { quoted: mek }
       );
 
+      await browser.close();
       delete pendingGovDoc[sender];
     } catch (e) {
-      console.error("Download failed:", e.message);
-      reply("⚠️ Failed to download or send PDF. It may not be public or is blocked by govdoc.lk.");
+      console.error("❌ Puppeteer download failed:", e.message);
+      reply("⚠️ Failed to download PDF using browser automation. The file may not be available.");
       delete pendingGovDoc[sender];
     }
   }
