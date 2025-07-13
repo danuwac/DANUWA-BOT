@@ -6,7 +6,7 @@ const pendingGovDoc = {};
 
 // STEP 1: Search command
 cmd({
-  pattern: "govdoc ?(.*)",
+  pattern: "govdoc",
   desc: "Search govdoc.lk for term test papers",
   category: "education",
   filename: __filename
