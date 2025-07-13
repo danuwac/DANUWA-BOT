@@ -1,135 +1,121 @@
-const axios = require("axios");
-const cheerio = require("cheerio");
 const { cmd } = require('../command');
+const axios = require('axios');
+const cheerio = require('cheerio');
 
-const pendingGovDoc = {};
+const headers = {
+  'User-Agent': 'Mozilla/5.0',
+  'Accept-Language': 'en-US,en;q=0.9',
+};
 
-// STEP 1: Search command
+async function fetchGovdocPosts(gradeSlug) {
+  const url = `https://govdoc.lk/category/term-test-papers/${gradeSlug}`;
+  const res = await axios.get(url, { headers });
+  const $ = cheerio.load(res.data);
+  const posts = [];
+
+  // Select only .custom-card <a> NOT inside .info-body (related section)
+  $('a.custom-card').each((_, el) => {
+    // Skip if inside .info-body (related)
+    if ($(el).closest('.info-body').length > 0) return;
+
+    const link = $(el).attr('href');
+    const title = $(el).find('h5.cate-title').text().trim();
+    if (link && title) {
+      posts.push({ title, link });
+    }
+  });
+
+  return posts.slice(0, 20); // top 20 results only
+}
+
 cmd({
-  pattern: "govdoc",
-  desc: "Search govdoc.lk for term test papers",
-  category: "education",
+  pattern: 'govdoc',
+  use: '.govdoc grade 11',
+  desc: 'Get term test papers from govdoc.lk',
+  category: 'education',
   filename: __filename
-}, async (conn, m, { match, reply }) => {
-  const query = match || "";
-  if (!query) return reply("🔎 Enter a subject or keyword to search on govdoc.lk\n\nExample: `.govdoc science grade 11`");
+}, async (conn, mek, m, { from, q }) => {
+  if (!q) return m.reply('❌ Please provide a grade. Example: .govdoc grade 11');
 
-  try {
-    const searchUrl = `https://govdoc.lk/?s=${encodeURIComponent(query)}`;
-    const res = await axios.get(searchUrl);
-    const $ = cheerio.load(res.data);
+  await m.react('📚');
 
-    const results = [];
+  const gradeSlug = q.toLowerCase().replace(/\s+/g, '-'); // "grade 11" -> "grade-11"
+  const posts = await fetchGovdocPosts(gradeSlug);
 
-    $(".post-wrapper .card").each((i, el) => {
-      const link = $(el).find("a").attr("href");
-      const title = $(el).find("h5").text().trim();
+  if (!posts.length) return m.reply(`❌ No papers found for *${q}*`);
 
-      if (
-        link &&
-        !link.includes("/page/") && // ✅ Skip "Related Pages"
-        title &&
-        !title.toLowerCase().includes("related")
-      ) {
-        results.push({ title, link });
-      }
-    });
+  let msg = `📚 *GovDoc ${q.toUpperCase()} Term Test Papers*\n────────────────────\n_Reply with number to download_\n\n`;
+  posts.forEach((post, i) => {
+    msg += `*${i + 1}.* ${post.title}\n`;
+  });
 
-    if (!results.length) return reply("❌ No results found for: " + query);
+  await conn.sendMessage(from, { text: msg }, { quoted: mek });
 
-    let text = `📝 *Search Results for:* _${query}_\n\n`;
-    results.forEach((r, i) => {
-      text += `*${i + 1}. ${r.title}*\n`;
-    });
-    text += `\n📥 Reply with the *number* of the paper to continue.`;
-
-    pendingGovDoc[m.sender] = {
-      step: "select",
-      results
-    };
-
-    return reply(text);
-
-  } catch (e) {
-    return reply("❌ Failed to fetch results.");
-  }
+  // 🛑 Step 2 (reply and download) comes next
 });
-
-// STEP 2: User selects paper
 cmd({
-  filter: m => pendingGovDoc[m.sender] && pendingGovDoc[m.sender].step === "select"
+  filter: (m) => pendingGovDoc[m.sender] && pendingGovDoc[m.sender].step === "select",
 }, async (conn, m, { reply }) => {
-  const num = parseInt(m.body.trim());
+  const selected = parseInt(m.body.trim());
   const pending = pendingGovDoc[m.sender];
-  if (isNaN(num) || num < 1 || num > pending.results.length) {
+  if (isNaN(selected) || selected < 1 || selected > pending.results.length) {
     return reply("❌ Invalid selection.");
   }
 
-  const selected = pending.results[num - 1];
-  try {
-    const res = await axios.get(selected.link);
-    const $ = cheerio.load(res.data);
+  const selectedResult = pending.results[selected - 1];
+  const { data } = await axios.get(selectedResult.url);
+  const $ = cheerio.load(data);
 
-    const languages = [];
-    $(".cart-button a.btn").each((i, el) => {
-      const lang = $(el).text().trim();
-      const link = $(el).attr("href");
-      if (link && lang) languages.push({ lang, link });
-    });
+  const languages = [];
 
-    if (!languages.length) {
-      delete pendingGovDoc[m.sender];
-      return reply("⚠️ No language versions found.");
+  $(".btn-row a").each((i, el) => {
+    const lang = $(el).find("button").text().trim();
+    const href = $(el).attr("href");
+    if (lang && href && href.includes("govdoc.lk/view")) {
+      languages.push({ lang, link: href.startsWith("http") ? href : `https://govdoc.lk${href}` });
     }
+  });
 
-    let text = `📚 *${selected.title}*\n\nChoose a language to download:\n`;
-    languages.forEach((l, i) => {
-      text += `*${i + 1}. ${l.lang}*\n`;
-    });
-
-    pendingGovDoc[m.sender] = {
-      step: "download",
-      selected,
-      languages
-    };
-
-    return reply(text);
-
-  } catch (e) {
+  if (!languages.length) {
     delete pendingGovDoc[m.sender];
-    return reply("❌ Failed to fetch language options.");
+    return reply("⚠️ No available language downloads found.");
   }
+
+  let msg = `📄 *Available Languages for:* _${selectedResult.title}_\n\n`;
+  languages.forEach((l, i) => {
+    msg += `${i + 1}. ${l.lang}\n`;
+  });
+  msg += `\n_Reply with a number (1-${languages.length}) to download._`;
+
+  pendingGovDoc[m.sender] = {
+    step: "download",
+    selected: selectedResult,
+    languages
+  };
+
+  reply(msg);
 });
 
 // STEP 3: User selects language
 cmd({
-  filter: m => pendingGovDoc[m.sender] && pendingGovDoc[m.sender].step === "download"
+  filter: (m) => pendingGovDoc[m.sender] && pendingGovDoc[m.sender].step === "download",
 }, async (conn, m, { reply }) => {
-  const num = parseInt(m.body.trim());
+  const selected = parseInt(m.body.trim());
   const pending = pendingGovDoc[m.sender];
-  if (isNaN(num) || num < 1 || num > pending.languages.length) {
+  if (isNaN(selected) || selected < 1 || selected > pending.languages.length) {
     return reply("❌ Invalid selection.");
   }
 
-  const lang = pending.languages[num - 1];
+  const lang = pending.languages[selected - 1];
+
   try {
-    const res = await axios.get(lang.link);
-    const $ = cheerio.load(res.data);
-
-    const downloadUrl = $(".cart-button a.btn").attr("href");
-    if (!downloadUrl || !downloadUrl.includes("/download/")) {
-      delete pendingGovDoc[m.sender];
-      return reply("⚠️ Download link not found.");
-    }
-
     await conn.sendMessage(m.chat, {
-      document: { url: downloadUrl },
+      document: { url: lang.link },
       mimetype: "application/pdf",
       fileName: `${pending.selected.title} - ${lang.lang}.pdf`
     }, { quoted: m });
-
   } catch (e) {
-    return reply("❌ Failed to fetch download link.");
+    reply("⚠️ Failed to send the PDF. Try again.");
   }
 
   delete pendingGovDoc[m.sender];
