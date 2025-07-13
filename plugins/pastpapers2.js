@@ -77,6 +77,7 @@ cmd(
 
     const selectedResult = pending.results[selected - 1];
 
+    // Fetch the language page
     try {
       const { data } = await axios.get(selectedResult.link, { headers });
       const $ = cheerio.load(data);
@@ -139,18 +140,23 @@ cmd(
     const lang = pending.languages[selected - 1];
 
     try {
-      const { data } = await axios.get(lang.link, { headers });
-      const $ = cheerio.load(data);
+      // 1. Fetch the language page (e.g. https://govdoc.lk/view?id=8752&fid=66acbc4935e88)
+      const { data: langPageData } = await axios.get(lang.link, { headers });
+      const $ = cheerio.load(langPageData);
+
+      // 2. Extract the actual download link from the button inside that page
       const downloadUrl = $(".button.cart-button a.btn").attr("href");
 
       if (!downloadUrl || !downloadUrl.includes("/download/")) {
         throw new Error("Download link not found");
       }
 
+      // Make full URL if relative
       const fullDownloadUrl = downloadUrl.startsWith("http")
         ? downloadUrl
         : `https://govdoc.lk${downloadUrl}`;
 
+      // 3. Send the PDF document to user
       await robin.sendMessage(
         from,
         {
@@ -161,6 +167,7 @@ cmd(
         { quoted: mek }
       );
 
+      // Clear user pending state
       delete pendingGovDoc[sender];
     } catch (e) {
       console.error(e);
