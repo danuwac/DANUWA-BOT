@@ -13,114 +13,60 @@ const headers = {
 
 const pendingGovDoc = {};
 
-// Subject short forms
-const subjectAliases = {
-  commerce: "business-accounting-studies",
-  ict: "information-and-communication-technology-ict",
-  hist: "history",
-  geo: "geography",
-  eng: "english-language",
-  sinh: "sinhala",
-  tam: "tamil",
-  home: "home-economics",
-  agri: "agriculture",
-  liteng: "literature-english",
-  litsin: "literature-sinhala",
-  littam: "literature-tamil",
-  dmt: "design-mechanical-technology",
-  dct: "design-construction-technology",
-  civ: "civic-education",
-  media: "communication-and-media-studies",
-  dance: "dance",
-  health: "health-physical-education",
-};
-
-// 🔁 Fetch up to 100 posts from all pages of a grade
-async function fetchGovdocPosts(grade, maxPages = 5) {
+// Step 1: Fetch post list
+async function fetchGovdocPosts(gradeSlug) {
+  const url = `https://govdoc.lk/category/term-test-papers/${gradeSlug}`;
+  const res = await axios.get(url, { headers });
+  const $ = cheerio.load(res.data);
   const posts = [];
 
-  for (let page = 1; page <= maxPages; page++) {
-    const url = `https://govdoc.lk/category/term-test-papers/grade-${grade}/page/${page}`;
-    try {
-      const res = await axios.get(url, { headers });
-      const $ = cheerio.load(res.data);
+  $("a.custom-card").each((_, el) => {
+    // ⛔ Exclude links inside "Related Pages" or promotional blocks
+    if ($(el).closest(".info-body").length > 0) return;
 
-      let found = 0;
-      $("a.custom-card").each((_, el) => {
-        const link = $(el).attr("href");
-        const title = $(el).find("h5.cate-title").text().trim();
+    const link = $(el).attr("href");
+    const title = $(el).find("h5.cate-title").text().trim();
+    if (link && title) posts.push({ title, link });
+  });
 
-        if (link && title && !posts.find(p => p.link === link)) {
-          posts.push({ title, link });
-          found++;
-        }
-      });
-
-      if (found === 0) break;
-    } catch (err) {
-      console.error(`⚠️ Error on page ${page}:`, err.message);
-      break;
-    }
-  }
-
-  return posts;
+  return posts.slice(0, 20);
 }
 
-// 📥 Command: .govdoc grade + subject
+
+// Step 1: User inputs grade
 cmd(
   {
     pattern: "govdoc",
     react: "📚",
-    desc: "Get term test papers by grade + subject",
+    desc: "Get term test papers from govdoc.lk",
     category: "education",
     filename: __filename,
   },
   async (robin, mek, m, { from, q, sender, reply }) => {
-    if (!q) return reply("❌ Example: `.govdoc 10 history` or `.govdoc grade 11 ict`");
+    if (!q) return reply("❌ Please provide a grade. Example: `.govdoc grade 11` or `.govdoc 10`");
 
     await m.react("📚");
 
-    const input = q.trim().toLowerCase().split(/\s+/);
-    let grade = "";
-    let subject = "";
+    let input = q.trim().toLowerCase();
+    let parts = input.split(/\s+/);
+    let gradeSlug = "";
 
-    if (input.length === 1 && /^\d{1,2}$/.test(input[0])) {
-      grade = input[0];
-    } else if (input[0] === "grade" && /^\d{1,2}$/.test(input[1])) {
-      grade = input[1];
-      subject = input.slice(2).join("-");
-    } else if (/^\d{1,2}$/.test(input[0])) {
-      grade = input[0];
-      subject = input.slice(1).join("-");
+    if (parts.length === 1 && /^\d{1,2}$/.test(parts[0])) {
+      gradeSlug = `grade-${parts[0]}`;
+    } else if (parts[0] === "grade" && /^\d{1,2}$/.test(parts[1])) {
+      gradeSlug = `grade-${parts[1]}`;
+    } else if (/^grade-\d{1,2}$/.test(parts[0])) {
+      gradeSlug = parts[0];
     } else {
-      return reply("❌ Invalid format. Try `.govdoc 10 ict` or `.govdoc grade 11 history`");
+      return reply("❌ Invalid grade format. Try `.govdoc 11` or `.govdoc grade 11`");
     }
 
-    if (subject && subjectAliases[subject]) {
-      subject = subjectAliases[subject];
-    }
+    const posts = await fetchGovdocPosts(gradeSlug);
+    if (!posts.length) return reply(`❌ No papers found for *${gradeSlug}*`);
 
-    let posts = await fetchGovdocPosts(grade);
-
-    if (subject) {
-      posts = posts.filter(p =>
-        p.title.toLowerCase().includes(subject.replace(/-/g, " "))
-      );
-    }
-
-    if (!posts.length) return reply(`❌ No papers found for *grade-${grade}${subject ? "/" + subject : ""}*`);
-
-    let msg = `📚 *GovDoc Grade ${grade.toUpperCase()}${subject ? " - " + subject.replace(/-/g, " ").toUpperCase() : ""} Papers*\n────────────────────\n_Reply with number to select paper_\n\n`;
+    let msg = `📚 *GovDoc ${gradeSlug.toUpperCase()} Term Test Papers*\n────────────────────\n_Reply with number to select paper_\n\n`;
     posts.forEach((post, i) => {
-      let title = post.title;
-
-      // 🌟 Highlight subject in result
-      if (subject) {
-        const regex = new RegExp(`(${subject.replace(/-/g, " ")})`, "gi");
-        title = title.replace(regex, "*$1*");
-      }
-
-      msg += `*${i + 1}.* ${title}\n`;
+      msg += `*${i + 1}.* ${post.title}\n`;
     });
 
     await robin.sendMessage(from, { text: msg }, { quoted: mek });
@@ -133,7 +79,7 @@ cmd(
   }
 );
 
-// 📄 Step 2: User selects paper
+// Step 2: User selects a paper
 cmd(
   {
     filter: (text, { sender }) =>
@@ -192,7 +138,7 @@ cmd(
   }
 );
 
-// 📥 Step 3: Puppeteer PDF downloader
+// Step 3: Download PDF with Puppeteer
 cmd(
   {
     filter: (text, { sender }) =>
@@ -227,6 +173,7 @@ cmd(
       await page.waitForSelector('a.btn.w-100[href*="/download/"]', { timeout: 15000 });
       await page.click('a.btn.w-100[href*="/download/"]');
 
+      // Wait for file to download
       let fileName;
       for (let i = 0; i < 20; i++) {
         const files = fs.readdirSync(downloadDir).filter(f => f.endsWith(".pdf"));
@@ -239,7 +186,9 @@ cmd(
 
       await browser.close();
 
-      if (!fileName) throw new Error("Download did not start in time.");
+      if (!fileName) {
+        throw new Error("Download did not start in time.");
+      }
 
       const filePath = path.join(downloadDir, fileName);
       const pdfBuffer = fs.readFileSync(filePath);
