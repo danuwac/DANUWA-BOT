@@ -177,39 +177,6 @@ async function connectToWA() {
       }
     }
 
-    if (mek.message?.interactiveResponseMessage) {
-      try {
-        const buttonId = mek.message.interactiveResponseMessage?.selectedButtonId;
-        const listId = mek.message?.listResponseMessage?.title;
-        
-        if (buttonId || listId) {
-          const from = mek.key.remoteJid;
-          let responseText = '';
-          
-          if (buttonId) {
-            switch(buttonId) {
-              case 'btn1':
-                responseText = '🌟 You pressed Button 1! Thanks for testing!';
-                break;
-              case 'btn2':
-                responseText = '🔔 You pressed Button 2! Great choice!';
-                break;
-              case 'btn3':
-                responseText = '🌀 You pressed Button 3! Awesome!';
-                break;
-              default:
-                responseText = '⚠️ Unknown button pressed';
-            }
-          } else if (listId) {
-            responseText = `📋 You selected: ${listId}`;
-          }
-          
-          await conn.sendMessage(from, { text: responseText }, { quoted: mek });
-        }
-      } catch (err) {
-        console.error('Button handler error:', err);
-      }
-    }
 
     // Run plugins onMessage hooks
     if (global.pluginHooks) {
@@ -342,6 +309,36 @@ async function connectToWA() {
         );
       } else return jid;
     };
+
+    // Add this right after your media download section
+    conn.ev.on('messages.upsert', async ({ messages }) => {
+      const msg = messages[0];
+    
+    // Button Response Handler
+      if (msg.message?.interactiveResponseMessage) {
+        const buttonId = msg.message.interactiveResponseMessage?.selectedButtonId;
+        const from = msg.key.remoteJid;
+        
+        if (buttonId) {
+          let response = "You selected: ";
+          switch(buttonId) {
+              case 'opt1': response += "Settings"; break;
+
+              case 'opt2': response += "Info"; break;
+              case 'opt3': response += "Features"; break;
+              default: response = "Unknown option";
+            }
+          await conn.sendMessage(from, { text: response });
+        }
+      }
+    
+    // List Response Handler
+      if (msg.message?.listResponseMessage) {
+        const selected = msg.message.listResponseMessage?.title;
+        const from = msg.key.remoteJid;
+        await conn.sendMessage(from, { text: `You chose: ${selected}` });
+      }
+    });
 
     if (isCmd) {
       const cmd = commands.find((c) => c.pattern === commandName || (c.alias && c.alias.includes(commandName)));
