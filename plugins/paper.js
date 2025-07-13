@@ -11,16 +11,15 @@ const headers = {
   "Accept-Language": "en-US,en;q=0.9",
 };
 
-const userFlow = {};
+const paperFlow = {}; // same as your `pendingQuality`
 const subjectAliases = {
-  // Shared aliases for all modes
   sft: "science-for-technology",
   et: "engineering-technology",
   bst: "bio-systems-technology",
   bio: "biology",
   agri: "agriculture",
   ict: "information-and-communication-technology-ict",
-  eng: "general-english",
+  eng: "english-language",
   econ: "economics",
   commerce: "business-accounting-studies",
   hist: "history",
@@ -39,198 +38,188 @@ const subjectAliases = {
   health: "health-physical-education",
 };
 
+// Step 1: .paper to show menu
 cmd(
   {
     pattern: "paper",
     react: "📚",
-    desc: "Download term, O/L, or A/L past papers",
+    desc: "Choose paper type",
     category: "education",
     filename: __filename,
   },
-  async (robin, mek, m, { from, sender }) => {
-    const msg = `📚 *Choose a paper category:*
-
+  async (robin, mek, m, { from, sender, reply }) => {
+    const msg = `📚 *Choose a paper category:*\n
 1. Term Test Papers
 2. GCE O/L Past Papers
 3. GCE A/L Past Papers
 
 _Reply with 1, 2, or 3 to continue._`;
+
     await robin.sendMessage(from, { text: msg }, { quoted: mek });
 
-    userFlow[sender] = { step: "menu", quoted: mek };
+    paperFlow[sender] = {
+      step: "menu",
+      quoted: mek,
+    };
   }
 );
 
+// Step 2: reply with 1–3
 cmd(
   {
     filter: (text, { sender }) =>
-      userFlow[sender] && userFlow[sender].step === "menu" && /^[1-3]$/.test(text.trim()),
+      paperFlow[sender] && paperFlow[sender].step === "menu" && /^[1-3]$/.test(text.trim()),
   },
   async (robin, mek, m, { sender, reply }) => {
-    const choice = parseInt(m.text.trim());
-    userFlow[sender] = { step: "input", type: choice, quoted: mek };
-
-    if (choice === 1) return reply("📥 Please enter: `grade subject` (e.g., `10 ict`)");
-    if (choice === 2) return reply("📥 Please enter: `year subject` (e.g., `2024 ict`)");
-    if (choice === 3) return reply("📥 Please enter subject (e.g., `biology`)");
+    const option = parseInt(m.text.trim());
+    if (option === 1) {
+      reply("📥 Enter grade and subject (e.g., `10 ict`)");
+      paperFlow[sender] = { step: "input", type: "term", quoted: mek };
+    } else if (option === 2) {
+      reply("📥 Enter year and subject (e.g., `2024 ict`)");
+      paperFlow[sender] = { step: "input", type: "ol", quoted: mek };
+    } else if (option === 3) {
+      reply("📥 Enter subject only (e.g., `biology`)");
+      paperFlow[sender] = { step: "input", type: "al", quoted: mek };
+    }
   }
 );
 
-// Handle input for all types
+// Step 3: user inputs details
 cmd(
   {
-    filter: (text, { sender }) => userFlow[sender] && userFlow[sender].step === "input",
+    filter: (text, { sender }) => paperFlow[sender] && paperFlow[sender].step === "input",
   },
-  async (robin, mek, m, { from, sender, reply }) => {
-    const { type } = userFlow[sender];
-    const q = m.text.trim().toLowerCase();
-    const parts = q.split(/\s+/);
+  async (robin, mek, m, { sender, from, reply }) => {
+    const { type } = paperFlow[sender];
+    const input = m.text.trim().toLowerCase();
+    const parts = input.split(/\s+/);
 
-    if (type === 1) {
-      // Term test: grade + subject
+    if (type === "term") {
       const grade = parts[0];
-      let subject = parts.slice(1).join("-");
-
-      subject = subjectAliases[subject] || subject;
+      const subject = subjectAliases[parts[1]] || parts[1];
       const slug = `grade-${grade}/${subject}`;
-      const posts = await scrapePapers(`https://govdoc.lk/category/term-test-papers/${slug}`);
-      return handleList(from, sender, posts, `Term Test Papers for Grade ${grade}`, robin, mek, reply);
+      const posts = await fetchPosts(`https://govdoc.lk/category/term-test-papers/${slug}`);
+      return sendPostList(posts, from, sender, robin, mek, `Term Test - Grade ${grade}`, reply);
     }
 
-    if (type === 2) {
-      // O/L past papers: year + subject
+    if (type === "ol") {
       const year = parts[0];
       const subject = subjectAliases[parts.slice(1).join("-")] || parts.slice(1).join("-");
       const urls = [
         `https://govdoc.lk/gce-ordinary-level-exam-${year}-${subject}-past-papers`,
         `https://govdoc.lk/gce-ordinary-level-exam-${year}-${parseInt(year) + 1}-${subject}-past-papers`,
       ];
-      for (let url of urls) {
-        const res = await getPaperInfo(url);
-        if (res.languages.length) {
-          return handleLangSelect(sender, from, robin, mek, res.title, res.languages, reply);
-        }
+      for (const url of urls) {
+        const res = await fetchLanguages(url);
+        if (res.languages.length) return sendLanguageOptions(from, sender, robin, mek, res, reply);
       }
-      return reply("❌ Not found. Check year or subject.");
+      return reply("❌ No papers found for that year and subject.");
     }
 
-    if (type === 3) {
-      // A/L past papers: subject only
-      let subject = subjectAliases[q] || q.replace(/\s+/g, "-");
-      const url = `https://govdoc.lk/category/past-papers/gce-advance-level-exam/${subject}`;
-      const posts = await scrapePapers(url);
-      return handleList(from, sender, posts, `A/L Past Papers: ${q.toUpperCase()}`, robin, mek, reply);
+    if (type === "al") {
+      const subject = subjectAliases[input] || input.replace(/\s+/g, "-");
+      const posts = await fetchPosts(`https://govdoc.lk/category/past-papers/gce-advance-level-exam/${subject}`);
+      return sendPostList(posts, from, sender, robin, mek, `A/L Past Papers - ${input.toUpperCase()}`, reply);
     }
   }
 );
 
-// Selection step
+// Step 4: user selects paper
 cmd(
   {
     filter: (text, { sender }) =>
-      userFlow[sender] && userFlow[sender].step === "select" && /^\d+$/.test(text.trim()),
+      paperFlow[sender] && paperFlow[sender].step === "select" && /^\d+$/.test(text.trim()),
   },
   async (robin, mek, m, { sender, from, reply }) => {
     const index = parseInt(m.text.trim()) - 1;
-    const { results, quoted } = userFlow[sender];
+    const { posts, quoted } = paperFlow[sender];
+    if (!posts[index]) return reply("❌ Invalid number.");
 
-    if (!results[index]) return reply("❌ Invalid selection.");
-    const { link, title } = results[index];
-    const res = await getPaperInfo(link);
-    return handleLangSelect(sender, from, robin, mek, title, res.languages, reply);
+    const res = await fetchLanguages(posts[index].link);
+    return sendLanguageOptions(from, sender, robin, mek, res, reply);
   }
 );
 
-// Language reply
+// Step 5: user selects language
 cmd(
   {
     filter: (text, { sender }) =>
-      userFlow[sender] && userFlow[sender].step === "download" && /^\d+$/.test(text.trim()),
+      paperFlow[sender] && paperFlow[sender].step === "download" && /^\d+$/.test(text.trim()),
   },
   async (robin, mek, m, { sender, from, reply }) => {
     const index = parseInt(m.text.trim()) - 1;
-    const { languages, title } = userFlow[sender];
-    if (!languages[index]) return reply("❌ Invalid option.");
+    const { languages, title } = paperFlow[sender];
+    const selected = languages[index];
+    if (!selected) return reply("❌ Invalid option.");
 
-    const lang = languages[index];
-    const buffer = await downloadPDF(lang.link);
-    if (!buffer) return reply("⚠️ Failed to download.");
+    await reply("⏳ Downloading... Please wait.");
+    const pdf = await downloadPDF(selected.link);
+    if (!pdf) return reply("❌ Download failed.");
 
-    await robin.sendMessage(
-      from,
-      {
-        document: buffer,
-        mimetype: "application/pdf",
-        fileName: `${title} - ${lang.lang}.pdf`,
-      },
-      { quoted: mek }
-    );
+    await robin.sendMessage(from, {
+      document: pdf,
+      mimetype: "application/pdf",
+      fileName: `${title} - ${selected.lang}.pdf`,
+    }, { quoted: mek });
 
-    delete userFlow[sender];
+    delete paperFlow[sender];
   }
 );
 
-// --- UTIL FUNCTIONS ---
-async function scrapePapers(url) {
-  const res = await axios.get(url, { headers });
-  const $ = cheerio.load(res.data);
-  const posts = [];
+// Helpers
 
-  $("a.custom-card").each((_, el) => {
-    const link = $(el).attr("href");
-    const title = $(el).find("h5.cate-title").text().trim();
-    if (link && title) posts.push({ title, link });
-  });
-
-  return posts.slice(0, 20);
+async function fetchPosts(url) {
+  try {
+    const res = await axios.get(url, { headers });
+    const $ = cheerio.load(res.data);
+    const posts = [];
+    $("a.custom-card").each((_, el) => {
+      const link = $(el).attr("href");
+      const title = $(el).find("h5.cate-title").text().trim();
+      if (link && title) posts.push({ title, link });
+    });
+    return posts.slice(0, 20);
+  } catch {
+    return [];
+  }
 }
 
-async function getPaperInfo(url) {
+async function fetchLanguages(url) {
   try {
     const res = await axios.get(url, { headers });
     const $ = cheerio.load(res.data);
     const title = $("h1.entry-title").text().trim();
     const languages = [];
-
     $("a[href*='/view?id=']").each((_, el) => {
       const lang = $(el).find("button").text().trim();
       const href = $(el).attr("href");
       if (lang && href) {
-        languages.push({
-          lang,
-          link: href.startsWith("http") ? href : `https://govdoc.lk${href}`,
-        });
+        languages.push({ lang, link: href.startsWith("http") ? href : `https://govdoc.lk${href}` });
       }
     });
-
     return { title, languages };
   } catch {
     return { title: "", languages: [] };
   }
 }
 
-async function handleList(from, sender, posts, title, robin, mek, reply) {
-  if (!posts.length) return reply("❌ No papers found.");
-  let msg = `📚 *${title}*\n\n_Reply with number to select paper._\n\n`;
-  posts.forEach((p, i) => (msg += `*${i + 1}.* ${p.title}\n`));
+async function sendPostList(posts, from, sender, robin, mek, title, reply) {
+  if (!posts.length) return reply("❌ No posts found.");
+  let msg = `📄 *${title}*\n_Reply with number to select paper._\n\n`;
+  posts.forEach((p, i) => msg += `*${i + 1}.* ${p.title}\n`);
   await robin.sendMessage(from, { text: msg }, { quoted: mek });
-
-  userFlow[sender] = { step: "select", results: posts };
+  paperFlow[sender] = { step: "select", posts };
 }
 
-async function handleLangSelect(sender, from, robin, mek, title, languages, reply) {
-  if (!languages.length) return reply("⚠️ No language options.");
+async function sendLanguageOptions(from, sender, robin, mek, { title, languages }, reply) {
+  if (!languages.length) return reply("❌ No download links.");
   let msg = `🌐 *Available Languages for:* _${title}_\n\n`;
-  languages.forEach((l, i) => (msg += `*${i + 1}.* ${l.lang}\n`));
-  msg += `\n_Reply with number to download._`;
+  languages.forEach((l, i) => msg += `*${i + 1}.* ${l.lang}\n`);
+  msg += `_Reply with number to download._`;
 
   await robin.sendMessage(from, { text: msg }, { quoted: mek });
-
-  userFlow[sender] = {
-    step: "download",
-    title,
-    languages,
-  };
+  paperFlow[sender] = { step: "download", title, languages };
 }
 
 async function downloadPDF(link) {
@@ -266,8 +255,7 @@ async function downloadPDF(link) {
     await browser.close();
     fs.rmSync(dir, { recursive: true, force: true });
     return buffer;
-  } catch (e) {
-    console.error("PDF Download failed:", e.message);
+  } catch {
     return null;
   }
 }
