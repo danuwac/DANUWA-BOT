@@ -7,7 +7,7 @@ const headers = {
   "Accept-Language": "en-US,en;q=0.9",
 };
 
-// Global object to keep reply context per user
+// Keep reply context per user
 const pendingGovDoc = {};
 
 // Step 1: Fetch test paper list for a grade
@@ -18,7 +18,7 @@ async function fetchGovdocPosts(gradeSlug) {
   const posts = [];
 
   $("a.custom-card").each((_, el) => {
-    if ($(el).closest(".info-body").length > 0) return; // skip related
+    if ($(el).closest(".info-body").length > 0) return; // skip related section
     const link = $(el).attr("href");
     const title = $(el).find("h5.cate-title").text().trim();
     if (link && title) posts.push({ title, link });
@@ -27,7 +27,7 @@ async function fetchGovdocPosts(gradeSlug) {
   return posts.slice(0, 20);
 }
 
-// Command: .govdoc grade 11
+// Step 1 command: list papers for grade
 cmd(
   {
     pattern: "govdoc",
@@ -61,7 +61,7 @@ cmd(
   }
 );
 
-// Reply Handler Step 2: User replies with paper number
+// Step 2 reply handler: user selects paper number
 cmd(
   {
     filter: (text, { sender }) =>
@@ -77,12 +77,11 @@ cmd(
 
     const selectedResult = pending.results[selected - 1];
 
-    // Fetch the language page
     try {
       const { data } = await axios.get(selectedResult.link, { headers });
       const $ = cheerio.load(data);
 
-      // Extract languages from .btn-row a > button
+      // Extract language buttons from page
       const languages = [];
       $(".btn-row a").each((_, el) => {
         const lang = $(el).find("button").text().trim();
@@ -106,7 +105,6 @@ cmd(
       });
       langMsg += `\n_Reply with a number (1-${languages.length}) to download._`;
 
-      // Update context for next step
       pendingGovDoc[sender] = {
         step: "download",
         selected: selectedResult,
@@ -123,7 +121,7 @@ cmd(
   }
 );
 
-// Reply Handler Step 3: User replies with language number to download
+// Step 3 reply handler: user selects language number, send PDF
 cmd(
   {
     filter: (text, { sender }) =>
@@ -140,34 +138,37 @@ cmd(
     const lang = pending.languages[selected - 1];
 
     try {
-      // 1. Fetch the language page (e.g. https://govdoc.lk/view?id=8752&fid=66acbc4935e88)
+      // Fetch the language page which contains the download button
       const { data: langPageData } = await axios.get(lang.link, { headers });
       const $ = cheerio.load(langPageData);
 
-      // 2. Extract the actual download link from the button inside that page
-      const downloadUrl = $(".button.cart-button a.btn").attr("href");
+      // Find all links containing '/download/'
+      const downloadLinks = [];
+      $("a").each((_, el) => {
+        const href = $(el).attr("href");
+        if (href && href.includes("/download/")) {
+          downloadLinks.push(href);
+        }
+      });
 
-      if (!downloadUrl || !downloadUrl.includes("/download/")) {
+      if (!downloadLinks.length) {
         throw new Error("Download link not found");
       }
 
-      // Make full URL if relative
-      const fullDownloadUrl = downloadUrl.startsWith("http")
-        ? downloadUrl
-        : `https://govdoc.lk${downloadUrl}`;
+      const downloadUrl = downloadLinks[0].startsWith("http")
+        ? downloadLinks[0]
+        : `https://govdoc.lk${downloadLinks[0]}`;
 
-      // 3. Send the PDF document to user
       await robin.sendMessage(
         from,
         {
-          document: { url: fullDownloadUrl },
+          document: { url: downloadUrl },
           mimetype: "application/pdf",
           fileName: `${pending.selected.title} - ${lang.lang}.pdf`,
         },
         { quoted: mek }
       );
 
-      // Clear user pending state
       delete pendingGovDoc[sender];
     } catch (e) {
       console.error(e);
