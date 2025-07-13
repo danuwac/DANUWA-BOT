@@ -2,14 +2,14 @@ const { cmd } = require("../command");
 
 cmd({
   pattern: "govdocmenu",
-  desc: "Show GovDoc.lk paper menu with classic buttons",
+  desc: "Show GovDoc.lk paper menu (Baileys 6.7.18 buttons)",
   react: "📚",
   category: "education",
   filename: __filename,
 },
 async (conn, mek, m, { from, quoted, reply }) => {
   try {
-    const buttonMessage = {
+    await conn.sendMessage(from, {
       text: `╔══ ❖  *📚 DANUWA-MD MENU* ❖ ══╗
 
 📝  Term Test Papers (Grade 6–13)
@@ -20,33 +20,30 @@ async (conn, mek, m, { from, quoted, reply }) => {
 
 ⚡ *Powered By:* ©DANUWA-MD ❤️`,
       footer: "Select an option below",
-      buttons: [
+      templateButtons: [
         {
-          buttonId: ".termtest",
-          buttonText: {
-            displayText: "📘 Term Test"
-          },
-          type: 1
+          index: 1,
+          quickReplyButton: {
+            displayText: "📘 Term Test",
+            id: ".termtest"
+          }
         },
         {
-          buttonId: ".olpast",
-          buttonText: {
-            displayText: "📄 O/L Papers"
-          },
-          type: 1
+          index: 2,
+          quickReplyButton: {
+            displayText: "📄 O/L Papers",
+            id: ".olpast"
+          }
         },
         {
-          buttonId: ".alpast",
-          buttonText: {
-            displayText: "📗 A/L Papers"
-          },
-          type: 1
+          index: 3,
+          quickReplyButton: {
+            displayText: "📗 A/L Papers",
+            id: ".alpast"
+          }
         }
-      ],
-      headerType: 1
-    };
-
-    await conn.sendMessage(from, buttonMessage, { quoted: mek });
+      ]
+    }, { quoted: mek });
 
   } catch (err) {
     console.error("❌ Error sending govdocmenu:", err);
