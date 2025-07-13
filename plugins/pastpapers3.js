@@ -41,15 +41,38 @@ cmd(
     filename: __filename,
   },
   async (robin, mek, m, { from, q, sender, reply }) => {
-    if (!q) return reply("❌ Please provide a subject. Example: `.pastpapers biology`");
+    if (!q) return reply("❌ Please provide a subject. Example: `.pastpapers science`");
 
-    const subjectSlug = q.trim().toLowerCase().replace(/\s+/g, "-");
-
-
+    const subjectAliases = {
+      hist: "history",
+      it: "information-and-communication-technology",
+      ict: "information-and-communication-technology",
+      commerce: "business-and-accounting-studies",
+      geo: "geography",
+      civic: "civic-education",
+      art: "art-and-craft",
+      home: "home-economics",
+      health: "health-and-physical-education",
+      media: "communication-and-media-studies",
+      dct: "design-and-construction-technology",
+      dmt: "design-and-mechanical-technology",
+      det: "design-electrical-and-electronic-technology",
+      shorthand: "electronic-writing-and-shorthand",
+      agri: "agriculture-and-food-technology",
+      aqua: "aquatic-bioresources-technology",
+      music: "music-art-dancing-drama-and-theater",
+      liteng: "literature-english",
+      sinhala_literature: "literature-sinhala",
+      tamil_literature: "literature-tamil",
+      arabic_literature: "literature-arabic"
+    };
+    
+    const rawInput = q.trim().toLowerCase();
+    const subjectSlug = subjectAliases[rawInput] || rawInput.replace(/\s+/g, "-");
     const posts = await fetchSubjectPapers(subjectSlug);
     if (!posts.length) return reply(`❌ No past papers found for *${q}*`);
 
-    let msg = `📄 *A/L Past Papers: ${q.toUpperCase()}*\n────────────────────\n_Reply with number to select paper_\n\n`;
+    let msg = `📄 *O/L Past Papers: ${q.toUpperCase()}*\n────────────────────\n_Reply with number to select paper_\n\n`;
     posts.forEach((post, i) => {
       msg += `*${i + 1}.* ${post.title}\n`;
     });
