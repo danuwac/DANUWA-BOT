@@ -9,7 +9,7 @@ const headers = {
 
 const pendingGovDoc = {};
 
-// Fetch paper list from govdoc.lk
+// Step 1: Get paper list by grade
 async function fetchGovdocPosts(gradeSlug) {
   const url = `https://govdoc.lk/category/term-test-papers/${gradeSlug}`;
   const res = await axios.get(url, { headers });
@@ -26,6 +26,7 @@ async function fetchGovdocPosts(gradeSlug) {
   return posts.slice(0, 20);
 }
 
+// Command: .govdoc grade 11
 cmd(
   {
     pattern: "govdoc",
@@ -117,7 +118,7 @@ cmd(
   }
 );
 
-// Step 3: Download PDF
+// Step 3: Download and send PDF
 cmd(
   {
     filter: (text, { sender }) =>
@@ -134,29 +135,32 @@ cmd(
     const lang = pending.languages[selected - 1];
 
     try {
+      // Visit the /view?id=... page to get the real download link
       const { data: langPage } = await axios.get(lang.link, { headers });
       const $ = cheerio.load(langPage);
 
-      // Find the real download button link
-      const downloadBtn = $('a.btn.w-100[href*="/download/"]').attr("href");
+      const downloadPath = $('a.btn.w-100[href*="/download/"]').attr("href");
+      if (!downloadPath) throw new Error("Download link not found");
 
-      if (!downloadBtn) throw new Error("Download link not found");
+      const downloadUrl = downloadPath.startsWith("http")
+        ? downloadPath
+        : `https://govdoc.lk${downloadPath}`;
 
-      const rawUrl = downloadBtn.startsWith("http")
-        ? downloadBtn
-        : `https://govdoc.lk${downloadBtn}`;
-
-      const response = await axios.get(rawUrl, {
-        headers,
+      // IMPORTANT: Add Referer header to avoid govdoc.lk protection
+      const downloadResponse = await axios.get(downloadUrl, {
+        headers: {
+          ...headers,
+          Referer: lang.link,
+        },
         responseType: "arraybuffer",
       });
 
-      const contentType = response.headers["content-type"];
+      const contentType = downloadResponse.headers["content-type"];
       if (!contentType.includes("pdf")) {
         throw new Error("Not a PDF file. Got: " + contentType);
       }
 
-      const pdfBuffer = Buffer.from(response.data);
+      const pdfBuffer = Buffer.from(downloadResponse.data);
       const fileName = `${pending.selected.title} - ${lang.lang}.pdf`;
 
       await robin.sendMessage(
@@ -172,7 +176,7 @@ cmd(
       delete pendingGovDoc[sender];
     } catch (e) {
       console.error("Download failed:", e.message);
-      reply("⚠️ Failed to download or send PDF. It may not be public or available.");
+      reply("⚠️ Failed to download or send PDF. It may not be public or accessible at the moment.");
       delete pendingGovDoc[sender];
     }
   }
