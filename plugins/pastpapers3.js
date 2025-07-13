@@ -12,8 +12,8 @@ const headers = {
 };
 
 const subjectAliases = {
-  bas: "business-accounting-studies",
-  ict: "information-and-communication-technology",
+  commerce: "business-accounting-studies",
+  ict: "information-and-communication-technology-ict",
   hist: "history",
   geo: "geography",
   eng: "english-language",
@@ -29,6 +29,7 @@ const subjectAliases = {
   civ: "civic-education",
   media: "communication-and-media-studies",
   dance: "dance",
+  health: "health-physical-education",
 };
 
 const pendingPastPaper = {};
