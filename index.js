@@ -311,32 +311,20 @@ async function connectToWA() {
     };
 
     // Add this right after your media download section
-    conn.ev.on('messages.upsert', async ({ messages }) => {
+// Interactive Message Handler
+    conn.ev.on('messages.upsert', ({ messages }) => {
       const msg = messages[0];
     
-    // Button Response Handler
-      if (msg.message?.interactiveResponseMessage) {
-        const buttonId = msg.message.interactiveResponseMessage?.selectedButtonId;
-        const from = msg.key.remoteJid;
-        
-        if (buttonId) {
-          let response = "You selected: ";
-          switch(buttonId) {
-              case 'opt1': response += "Settings"; break;
-
-              case 'opt2': response += "Info"; break;
-              case 'opt3': response += "Features"; break;
-              default: response = "Unknown option";
-            }
-          await conn.sendMessage(from, { text: response });
-        }
+    // Handle button clicks
+      if (msg?.message?.interactiveResponseMessage) {
+        const response = `You clicked: ${msg.message.interactiveResponseMessage.selectedButtonId}`;
+        conn.sendMessage(msg.key.remoteJid, { text: response });
       }
     
-    // List Response Handler
-      if (msg.message?.listResponseMessage) {
-        const selected = msg.message.listResponseMessage?.title;
-        const from = msg.key.remoteJid;
-        await conn.sendMessage(from, { text: `You chose: ${selected}` });
+    // Handle list selections
+      if (msg?.message?.listResponseMessage) {
+        const response = `You selected: ${msg.message.listResponseMessage.title}`;
+        conn.sendMessage(msg.key.remoteJid, { text: response });
       }
     });
 
