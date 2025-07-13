@@ -1,41 +1,56 @@
-const { cmd } = require('../command');
+const { cmd } = require("../command");
 
-cmd({
-    pattern: "testbutton",
-    react: "🧪",
-    desc: "Send a test message with buttons",
-    category: "main",
-    filename: __filename
-},
-async (conn, mek, m, {
-    from, reply
-}) => {
-    try {
-        await conn.sendMessage(from, {
-            text: "🧪 *This is a test message with buttons!*",
-            footer: "🔧 Powered by Danuwa MD",
-            buttons: [
-                { buttonId: 'id1', buttonText: { displayText: '💡 Test 1' }, type: 1 },
-                { buttonId: 'id2', buttonText: { displayText: '⚙️ Test 2' }, type: 1 },
-                { buttonId: 'id3', buttonText: { displayText: '📞 Call Owner' }, type: 1 }
-            ],
-            headerType: 1,
-            contextInfo: {
-                externalAdReply: {
-                    showAdAttribution: true,
-                    title: 'DANUWA-MD',
-                    body: 'Official Bot Test',
-                    mediaType: 1,
-                    previewType: "PHOTO",
-                    renderLargerThumbnail: true,
-                    thumbnailUrl: "https://github.com/DANUWA-MD/DANUWA-BOT/blob/main/images/Alive.png?raw=true",
-                    sourceUrl: "https://github.com/DANUWA-MD/DANUWA-BOT"
-                }
-            }
-        }, { quoted: mek });
+const userSelection = {};
 
-    } catch (err) {
-        console.error(err);
-        reply(`❌ Error: ${err.message}`);
+// Step 1: Menu command
+cmd(
+  {
+    pattern: "papertest",
+    react: "📚",
+    desc: "Open paper type selection menu",
+    category: "education",
+    filename: __filename,
+  },
+  async (robin, mek, m, { from, sender, reply }) => {
+    const menu = `📚 *Choose a paper category:*
+    
+1. Term Test Papers
+2. GCE O/L Past Papers
+3. GCE A/L Past Papers
+
+_Reply with a number (1-3) to continue._`;
+
+    await robin.sendMessage(from, { text: menu }, { quoted: mek });
+
+    userSelection[sender] = {
+      step: "awaiting_choice",
+      quoted: mek,
+    };
+  }
+);
+
+// Step 2: Handle reply
+cmd(
+  {
+    filter: (text, { sender }) =>
+      userSelection[sender] &&
+      userSelection[sender].step === "awaiting_choice" &&
+      /^[1-3]$/.test(text.trim()),
+  },
+  async (robin, mek, m, { sender, from, reply }) => {
+    const choice = parseInt(m.text.trim());
+
+    delete userSelection[sender];
+
+    switch (choice) {
+      case 1:
+        return reply("📝 Please type: `.govdoc 10 ict` (grade & subject)");
+      case 2:
+        return reply("📝 Please type: `.pastol 2024 ict` (year & subject)");
+      case 3:
+        return reply("📝 Please type: `.pastpapers biology` (subject only)");
+      default:
+        return reply("❌ Invalid option.");
     }
-});
+  }
+);
