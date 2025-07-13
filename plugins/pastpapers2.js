@@ -2,6 +2,8 @@ const { cmd } = require('../command');
 const axios = require('axios');
 const cheerio = require('cheerio');
 
+const pendingGovDoc = {}; // ✅ Declare this globally
+
 const headers = {
   'User-Agent': 'Mozilla/5.0',
   'Accept-Language': 'en-US,en;q=0.9',
@@ -15,7 +17,6 @@ async function fetchGovdocPosts(gradeSlug) {
 
   // Select only .custom-card <a> NOT inside .info-body (related section)
   $('a.custom-card').each((_, el) => {
-    // Skip if inside .info-body (related)
     if ($(el).closest('.info-body').length > 0) return;
 
     const link = $(el).attr('href');
@@ -25,9 +26,10 @@ async function fetchGovdocPosts(gradeSlug) {
     }
   });
 
-  return posts.slice(0, 20); // top 20 results only
+  return posts.slice(0, 20);
 }
 
+// Step 1: Search papers
 cmd({
   pattern: 'govdoc',
   use: '.govdoc grade 11',
@@ -39,7 +41,7 @@ cmd({
 
   await m.react('📚');
 
-  const gradeSlug = q.toLowerCase().replace(/\s+/g, '-'); // "grade 11" -> "grade-11"
+  const gradeSlug = q.toLowerCase().replace(/\s+/g, '-');
   const posts = await fetchGovdocPosts(gradeSlug);
 
   if (!posts.length) return m.reply(`❌ No papers found for *${q}*`);
@@ -51,8 +53,13 @@ cmd({
 
   await conn.sendMessage(from, { text: msg }, { quoted: mek });
 
-  // 🛑 Step 2 (reply and download) comes next
+  pendingGovDoc[m.sender] = {
+    step: "select",
+    results: posts
+  };
 });
+
+// Step 2: Choose a paper
 cmd({
   filter: (m) => pendingGovDoc[m.sender] && pendingGovDoc[m.sender].step === "select",
 }, async (conn, m, { reply }) => {
@@ -63,11 +70,10 @@ cmd({
   }
 
   const selectedResult = pending.results[selected - 1];
-  const { data } = await axios.get(selectedResult.url);
+  const { data } = await axios.get(selectedResult.link);
   const $ = cheerio.load(data);
 
   const languages = [];
-
   $(".btn-row a").each((i, el) => {
     const lang = $(el).find("button").text().trim();
     const href = $(el).attr("href");
@@ -96,7 +102,7 @@ cmd({
   reply(msg);
 });
 
-// STEP 3: User selects language
+// Step 3: Choose language & send PDF
 cmd({
   filter: (m) => pendingGovDoc[m.sender] && pendingGovDoc[m.sender].step === "download",
 }, async (conn, m, { reply }) => {
@@ -107,10 +113,18 @@ cmd({
   }
 
   const lang = pending.languages[selected - 1];
+  const res = await axios.get(lang.link);
+  const $ = cheerio.load(res.data);
+
+  const download = $(".cart-button a.btn").attr("href");
+  if (!download || !download.includes("/download/")) {
+    delete pendingGovDoc[m.sender];
+    return reply("⚠️ Download link not found.");
+  }
 
   try {
     await conn.sendMessage(m.chat, {
-      document: { url: lang.link },
+      document: { url: download },
       mimetype: "application/pdf",
       fileName: `${pending.selected.title} - ${lang.lang}.pdf`
     }, { quoted: m });
