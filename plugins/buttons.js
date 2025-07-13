@@ -1,6 +1,6 @@
 const { cmd } = require('../command');
 const config = require('../config');
-const { generateWAMessageFromContent } = require('@whyskeysockets/baileys');
+const { generateWAMessageFromContent } = require('@whiskeysockets/baileys');
 
 cmd({
     pattern: "buttons",
