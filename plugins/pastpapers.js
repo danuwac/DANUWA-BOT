@@ -181,8 +181,9 @@ cmd(
       return text && (/\d{4}/.test(text) || Object.values(STREAMS).some(streams => 
         Object.values(streams).flat().some(subject => 
           text.trim().toLowerCase().includes(subject.toLowerCase())
-        )
-      );
+                                          )
+                                                                      )
+                     );
     },
     on: "pastpapers"
   },
