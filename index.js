@@ -190,20 +190,6 @@ async function connectToWA() {
       }
     }
 
-    if (body === ".testbtn") {
-      await sock.sendMessage(from, {
-        text: "🧪 *Test Buttons*",
-        footer: "If you see this, buttons are working ✅",
-        buttons: [
-          {
-            buttonId: ".hello",
-            buttonText: { displayText: "👋 Say Hello" },
-            type: 1,
-          },
-        ],
-        headerType: 1,
-      }, { quoted: m });
-    }
 
     
     mek.message = (getContentType(mek.message) === 'ephemeralMessage') 
@@ -246,6 +232,22 @@ async function connectToWA() {
     const body = type === 'conversation'
       ? mek.message.conversation
       : mek.message[type]?.text || mek.message[type]?.caption || '';
+
+    if (body === ".testbtn") {
+      await sock.sendMessage(from, {
+        text: "🧪 *Test Buttons*",
+        footer: "If you see this, buttons are working ✅",
+        buttons: [
+          {
+            buttonId: ".hello",
+            buttonText: { displayText: "👋 Say Hello" },
+            type: 1,
+          },
+        ],
+        headerType: 1,
+      }, { quoted: m });
+    }
+
 
     const isCmd = body.startsWith(prefix);
     const commandName = isCmd ? body.slice(prefix.length).trim().split(" ")[0].toLowerCase() : '';
