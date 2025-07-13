@@ -77,7 +77,6 @@ cmd(
 
     const selectedResult = pending.results[selected - 1];
 
-    // Fetch the language page
     try {
       const { data } = await axios.get(selectedResult.link, { headers });
       const $ = cheerio.load(data);
@@ -142,17 +141,25 @@ cmd(
     try {
       const { data } = await axios.get(lang.link, { headers });
       const $ = cheerio.load(data);
-      const downloadUrl = $(".cart-button a.btn").attr("href");
+      const downloadUrl = $(".button.cart-button a.btn").attr("href");
 
       if (!downloadUrl || !downloadUrl.includes("/download/")) {
         throw new Error("Download link not found");
       }
 
-      await robin.sendMessage(from, {
-        document: { url: downloadUrl },
-        mimetype: "application/pdf",
-        fileName: `${pending.selected.title} - ${lang.lang}.pdf`,
-      }, { quoted: mek });
+      const fullDownloadUrl = downloadUrl.startsWith("http")
+        ? downloadUrl
+        : `https://govdoc.lk${downloadUrl}`;
+
+      await robin.sendMessage(
+        from,
+        {
+          document: { url: fullDownloadUrl },
+          mimetype: "application/pdf",
+          fileName: `${pending.selected.title} - ${lang.lang}.pdf`,
+        },
+        { quoted: mek }
+      );
 
       delete pendingGovDoc[sender];
     } catch (e) {
