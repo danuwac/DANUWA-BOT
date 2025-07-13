@@ -33,10 +33,11 @@ const subjectAliases = {
 };
 
 // 🔁 Fetch all posts (multi-page support)
-async function fetchGovdocPosts(slug, maxPages = 30) {
+async function fetchGovdocPosts(slug) {
   const posts = [];
+  let page = 1;
 
-  for (let page = 1; page <= maxPages; page++) {
+  while (true) {
     const url =
       page === 1
         ? `https://govdoc.lk/category/term-test-papers/${slug}`
@@ -47,11 +48,9 @@ async function fetchGovdocPosts(slug, maxPages = 30) {
       const $ = cheerio.load(res.data);
 
       const cards = $("a.custom-card");
+      if (cards.length === 0) break; // no more posts
 
-      if (cards.length === 0) {
-        console.warn(`⚠️ No cards found on page ${page}.`);
-        break; // No more results
-      }
+      let newPosts = 0;
 
       cards.each((_, el) => {
         const link = $(el).attr("href");
@@ -59,10 +58,14 @@ async function fetchGovdocPosts(slug, maxPages = 30) {
 
         if (link && title && !posts.find(p => p.link === link)) {
           posts.push({ title, link });
+          newPosts++;
         }
       });
+
+      if (newPosts === 0) break; // No new posts = done
+      page++;
     } catch (err) {
-      console.error(`❌ Error on page ${page}:`, err.message);
+      console.error(`❌ Failed to fetch page ${page}:`, err.message);
       break;
     }
   }
