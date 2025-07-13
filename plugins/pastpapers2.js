@@ -21,6 +21,9 @@ async function fetchGovdocPosts(gradeSlug) {
   const posts = [];
 
   $("a.custom-card").each((_, el) => {
+    // ⛔ Exclude links inside "Related Pages" or promotional blocks
+    if ($(el).closest(".info-body").length > 0) return;
+
     const link = $(el).attr("href");
     const title = $(el).find("h5.cate-title").text().trim();
     if (link && title) posts.push({ title, link });
