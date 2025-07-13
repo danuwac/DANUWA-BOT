@@ -66,7 +66,7 @@ function formatBytes(bytes, decimals = 2) {
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(decimals) + ' ' + sizes[i];
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(decimals)) + ' ' + sizes[i];
 }
 
 async function scrapePapers(source, exam, subject) {
@@ -207,7 +207,7 @@ ${subject ? `📖 Subject: *${EXAM_TYPES[examType].subjects[subject]}*\n` : ''}
     menuMessage += `\n\n💬 *Reply with the number of the paper you want*`;
 
     const sentMsg = await conn.sendMessage(from, {
-      image: { url: allPapers[0].image || 'https://example.com/default-paper.jpg' },
+      image: { url: allPapers[0].image || 'https://i.imgur.com/J5Q8X0A.png' },
       caption: menuMessage
     }, { quoted: mek });
 
@@ -215,12 +215,20 @@ ${subject ? `📖 Subject: *${EXAM_TYPES[examType].subjects[subject]}*\n` : ''}
     conn.ev.on('messages.upsert', async ({ messages }) => {
       const msg = messages[0];
       if (!msg.message?.extendedTextMessage || 
-          !msg.message.extendedTextMessage.contextInfo?.stanzaId === sentMsg.key.id) return;
+          msg.message.extendedTextMessage.contextInfo?.stanzaId !== sentMsg.key.id) return;
 
       const selectedNum = parseInt(msg.message.extendedTextMessage.text.trim());
-      if (isNaN(selectedNum) || selectedNum < 1 || selectedNum > allPapers.length) {
+      if (isNaN(selectedNum) {
         await conn.sendMessage(from, { 
-          text: '❌ Invalid selection. Please reply with a number from the list.',
+          text: '❌ Please reply with a number from the list.',
+          quoted: msg
+        });
+        return;
+      }
+
+      if (selectedNum < 1 || selectedNum > allPapers.length) {
+        await conn.sendMessage(from, { 
+          text: `❌ Please select a number between 1 and ${allPapers.length}.`,
           quoted: msg
         });
         return;
@@ -259,12 +267,20 @@ ${subject ? `📖 Subject: *${EXAM_TYPES[examType].subjects[subject]}*\n` : ''}
       conn.ev.on('messages.upsert', async ({ messages }) => {
         const dlMsg = messages[0];
         if (!dlMsg.message?.extendedTextMessage || 
-            !dlMsg.message.extendedTextMessage.contextInfo?.stanzaId === downloadMsg.key.id) return;
+            dlMsg.message.extendedTextMessage.contextInfo?.stanzaId !== downloadMsg.key.id) return;
 
         const selectedLinkNum = parseInt(dlMsg.message.extendedTextMessage.text.trim());
-        if (isNaN(selectedLinkNum) || selectedLinkNum < 1 || selectedLinkNum > downloadLinks.length) {
+        if (isNaN(selectedLinkNum) {
           await conn.sendMessage(from, { 
-            text: '❌ Invalid selection. Please reply with a number from the list.',
+            text: '❌ Please reply with a number from the list.',
+            quoted: dlMsg
+          });
+          return;
+        }
+
+        if (selectedLinkNum < 1 || selectedLinkNum > downloadLinks.length) {
+          await conn.sendMessage(from, { 
+            text: `❌ Please select a number between 1 and ${downloadLinks.length}.`,
             quoted: dlMsg
           });
           return;
