@@ -2,7 +2,7 @@ const { cmd } = require("../command");
 
 cmd(
   {
-    pattern: "govdoc",
+    pattern: "govdocmenu",
     desc: "GovDoc.lk main menu",
     react: "📚",
     category: "education",
