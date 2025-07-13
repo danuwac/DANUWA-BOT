@@ -33,7 +33,7 @@ const subjectAliases = {
 };
 
 // 🔁 Fetch all posts (multi-page support)
-async function fetchGovdocPosts(slug, maxPages = 3) {
+async function fetchGovdocPosts(slug, maxPages = 5) {
   const posts = [];
 
   for (let page = 1; page <= maxPages; page++) {
@@ -46,25 +46,28 @@ async function fetchGovdocPosts(slug, maxPages = 3) {
       const res = await axios.get(url, { headers });
       const $ = cheerio.load(res.data);
 
-      let foundAny = false;
-      $("a.custom-card").each((_, el) => {
-        if ($(el).closest(".info-body").length > 0) return;
+      const cards = $("a.custom-card");
+
+      if (cards.length === 0) {
+        console.warn(`⚠️ No cards found on page ${page}.`);
+        break; // No more results
+      }
+
+      cards.each((_, el) => {
         const link = $(el).attr("href");
         const title = $(el).find("h5.cate-title").text().trim();
-        if (link && title) {
+
+        if (link && title && !posts.find(p => p.link === link)) {
           posts.push({ title, link });
-          foundAny = true;
         }
       });
-
-      if (!foundAny) break;
     } catch (err) {
-      console.warn(`Failed to fetch page ${page}:`, err.message);
+      console.error(`❌ Error on page ${page}:`, err.message);
       break;
     }
   }
 
-  return posts.slice(0, 50);
+  return posts;
 }
 
 // 🧾 Command: .govdoc [grade] [subject]
