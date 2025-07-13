@@ -3,7 +3,7 @@ const { proto } = require("@whiskeysockets/baileys"); // Baileys import for comp
 
 cmd(
   {
-    pattern: "govdoc",
+    pattern: "govdocmenu",
     desc: "GovDoc.lk main menu",
     react: "📚",
     category: "education",
