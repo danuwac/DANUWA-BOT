@@ -1,6 +1,8 @@
 const { cmd } = require("../command");
 const axios = require("axios");
 const cheerio = require("cheerio");
+const fs = require("fs");
+const path = require("path");
 
 const headers = {
   "User-Agent": "Mozilla/5.0",
@@ -9,7 +11,7 @@ const headers = {
 
 const pendingGovDoc = {};
 
-// Step 1: Fetch paper list
+// Fetch paper list from govdoc.lk
 async function fetchGovdocPosts(gradeSlug) {
   const url = `https://govdoc.lk/category/term-test-papers/${gradeSlug}`;
   const res = await axios.get(url, { headers });
@@ -26,7 +28,7 @@ async function fetchGovdocPosts(gradeSlug) {
   return posts.slice(0, 20);
 }
 
-// Command: .govdoc grade 11
+// .govdoc grade 11
 cmd(
   {
     pattern: "govdoc",
@@ -59,7 +61,7 @@ cmd(
   }
 );
 
-// Step 2: Select post
+// Step 2: select paper number
 cmd(
   {
     filter: (text, { sender }) =>
@@ -118,7 +120,7 @@ cmd(
   }
 );
 
-// Step 3: Download PDF
+// Step 3: download PDF buffer and send
 cmd(
   {
     filter: (text, { sender }) =>
@@ -146,26 +148,31 @@ cmd(
         }
       });
 
-      if (!downloadLinks.length) {
-        throw new Error("Download link not found");
-      }
+      if (!downloadLinks.length) throw new Error("Download link not found");
 
       let rawUrl = downloadLinks[0].startsWith("http")
         ? downloadLinks[0]
         : `https://govdoc.lk${downloadLinks[0]}`;
 
-      // Convert to direct Google Drive download link
+      // Convert Google Drive link if needed
       const match = rawUrl.match(/\/file\/d\/([^/]+)\//);
       if (match) {
         rawUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`;
       }
 
+      // Download PDF as buffer
+      const response = await axios.get(rawUrl, {
+        headers,
+        responseType: "arraybuffer",
+      });
+
+      const pdfBuffer = Buffer.from(response.data);
       const fileName = `${pending.selected.title} - ${lang.lang}.pdf`;
 
       await robin.sendMessage(
         from,
         {
-          document: { url: rawUrl },
+          document: pdfBuffer,
           mimetype: "application/pdf",
           fileName,
         },
@@ -174,8 +181,8 @@ cmd(
 
       delete pendingGovDoc[sender];
     } catch (e) {
-      console.error(e);
-      reply("⚠️ Failed to fetch or send PDF. Please try again.");
+      console.error("PDF download failed:", e.message);
+      reply("⚠️ Failed to download or send PDF. It might not be public or is too large.");
       delete pendingGovDoc[sender];
     }
   }
