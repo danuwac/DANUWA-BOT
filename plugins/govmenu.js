@@ -3,18 +3,26 @@ const { proto, generateWAMessageFromContent } = require('@whiskeysockets/baileys
 
 cmd({
   pattern: "govdocmenu",
-  desc: "Test button menu",
   react: "📚",
+  desc: "Show GovDoc.lk paper menu with working buttons (Baileys v6.7.18)",
   category: "education",
-  filename: __filename,
+  filename: __filename
 },
 async (conn, mek, m, { from, quoted, reply }) => {
   try {
-    const content = {
+    const template = {
       templateMessage: {
         hydratedTemplate: {
-          hydratedContentText: "📚 *DANUWA-MD MENU*\n\nChoose an option below:",
-          hydratedFooterText: "Powered by DANUWA-MD ❤️",
+          hydratedContentText: `╔══ ❖  *📚 DANUWA-MD MENU* ❖ ══╗
+
+📝  Term Test Papers (Grade 6–13)
+📘  GCE O/L Past Papers
+📗  GCE A/L Past Papers
+
+╚═══════════════════════╝
+
+⚡ *Powered By:* ©DANUWA-MD ❤️`,
+          hydratedFooterText: "Select an option below",
           hydratedButtons: [
             {
               quickReplyButton: {
@@ -39,7 +47,7 @@ async (conn, mek, m, { from, quoted, reply }) => {
       }
     };
 
-    const msg = await generateWAMessageFromContent(from, proto.Message.fromObject(content), {
+    const msg = await generateWAMessageFromContent(from, proto.Message.fromObject(template), {
       userJid: conn.user.id,
       quoted: mek
     });
@@ -47,7 +55,7 @@ async (conn, mek, m, { from, quoted, reply }) => {
     await conn.relayMessage(from, msg.message, { messageId: msg.key.id });
 
   } catch (err) {
-    console.error("❌ Error in govdocmenu:", err);
-    await reply("❌ Error: " + err.message);
+    console.error("❌ govdocmenu button error:", err);
+    reply(`❌ Error:\n${err.message}`);
   }
 });
