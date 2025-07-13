@@ -33,6 +33,9 @@ const STREAMS = {
 let papersCache = {};
 const CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
 
+// Store user selections temporarily
+const userSelections = {};
+
 cmd(
   {
     pattern: "pastpapers",
@@ -97,7 +100,11 @@ async function scrapePastPapers(examType, stream) {
     const papers = [];
     
     // Example: Scrape from PastPapersWiki
-    const response = await axios.get(`${SCRAPE_SOURCES.PastPapersWiki}/${examType}-past-papers`);
+    const response = await axios.get(`${SCRAPE_SOURCES.PastPapersWiki}/${examType}-past-papers`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
     const $ = cheerio.load(response.data);
     
     // Example scraping logic (adjust based on actual website structure)
@@ -110,12 +117,12 @@ async function scrapePastPapers(examType, stream) {
       const url = $(el).find("a").attr("href");
       
       // Filter by stream if specified
-      if (!stream || STREAMS[examType][stream].some(s => subject.includes(s))) {
+      if (!stream || STREAMS[examType][stream]?.some(s => subject.includes(s))) {
         papers.push({
           title,
           year,
           subject,
-          url,
+          url: url.startsWith('http') ? url : `${SCRAPE_SOURCES.PastPapersWiki}${url}`,
           source: "PastPapersWiki"
         });
       }
@@ -171,8 +178,10 @@ async function sendPapersList(robin, from, mek, papers, examType, stream) {
 cmd(
   {
     filter: (text, { sender }) => {
-      return text && (/\d{4}/.test(text) || Object.values(STREAMS).some(stream => 
-        Object.values(stream).flat().includes(text.trim()))
+      return text && (/\d{4}/.test(text) || Object.values(STREAMS).some(streams => 
+        Object.values(streams).flat().some(subject => 
+          text.trim().toLowerCase().includes(subject.toLowerCase())
+        )
       );
     },
     on: "pastpapers"
@@ -209,7 +218,8 @@ cmd(
         // Store selection for next step
         userSelections[sender] = {
           type: "paper_selection",
-          papers: cachedPapers
+          papers: cachedPapers,
+          timestamp: Date.now()
         };
       }
     } catch (e) {
@@ -223,7 +233,8 @@ cmd(
 cmd(
   {
     filter: (text, { sender }) => {
-      return userSelections[sender]?.type === "paper_selection" && /^\d+$/.test(text.trim());
+      const selection = userSelections[sender];
+      return selection?.type === "paper_selection" && /^\d+$/.test(text.trim());
     }
   },
   async (robin, mek, m, { from, body, sender, reply }) => {
@@ -250,13 +261,13 @@ async function downloadAndSendPaper(robin, from, mek, paper) {
   await reply(`⏳ Downloading ${paper.subject} (${paper.year}) past paper...`);
   
   try {
-    // In a real implementation, you would:
+    // For production, you would:
     // 1. Download the PDF from paper.url
     // 2. Save it temporarily
     // 3. Send as document
     // 4. Delete the temp file
     
-    // For demo, we'll just send the URL
+    // For now, we'll send the direct link
     await robin.sendMessage(from, {
       text: `📚 *${paper.subject} (${paper.year})*\n\n` +
             `🔗 Download: ${paper.url}\n\n` +
@@ -270,12 +281,22 @@ async function downloadAndSendPaper(robin, from, mek, paper) {
   }
 }
 
-// Clear cache periodically
+// Clear cache and user selections periodically
 setInterval(() => {
   const now = Date.now();
+  
+  // Clear expired cache
   for (const [key, cache] of Object.entries(papersCache)) {
     if (now - cache.timestamp > CACHE_EXPIRY) {
       delete papersCache[key];
+    }
+  }
+  
+  // Clear expired user selections (5 minute timeout)
+  const SELECTION_TIMEOUT = 5 * 60 * 1000;
+  for (const [sender, selection] of Object.entries(userSelections)) {
+    if (now - selection.timestamp > SELECTION_TIMEOUT) {
+      delete userSelections[sender];
     }
   }
 }, 60 * 60 * 1000); // Check every hour
