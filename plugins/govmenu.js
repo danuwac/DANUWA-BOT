@@ -9,28 +9,22 @@ cmd(
     filename: __filename,
   },
   async (robin, mek, m, { from }) => {
-    const message = {
-      text: "📘 *GovDoc.lk Exam Resources*\n\nChoose an option below:",
-      footer: "Powered by Danuwa MD",
-      buttons: [
-        {
-          buttonId: ".termtest",
-          buttonText: { displayText: "📚 Term Test (Grade 6–13)" },
-          type: 1
-        },
-        {
-          buttonId: ".olpast",
-          buttonText: { displayText: "📄 O/L Past Papers" },
-          type: 1
-        },
-        {
-          buttonId: ".alpast",
-          buttonText: { displayText: "📄 A/L Past Papers" },
-          type: 1
-        }
-      ],
-      headerType: 1
-    };
+   const message = {
+  text: "📘 *GovDoc.lk Exam Resources*",
+  footer: "Powered by Danuwa MD",
+  title: "Choose an option:",
+  buttonText: "View Options",
+  sections: [
+    {
+      title: "Exam Resources",
+      rows: [
+        { title: "📚 Term Test (Grade 6–13)", rowId: ".termtest" },
+        { title: "📄 O/L Past Papers", rowId: ".olpast" },
+        { title: "📄 A/L Past Papers", rowId: ".alpast" }
+      ]
+    }
+  ]
+};
 
     await robin.sendMessage(from, message, { quoted: mek });
   }
