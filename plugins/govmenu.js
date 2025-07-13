@@ -1,4 +1,5 @@
 const { cmd } = require("../command");
+const { proto, generateWAMessageFromContent } = require('@whiskeysockets/baileys');
 
 cmd({
   pattern: "govdocmenu",
@@ -9,8 +10,10 @@ cmd({
 },
 async (conn, mek, m, { from, quoted, reply }) => {
   try {
-    const message = {
-      text: `╔══ ❖  *📚 DANUWA-MD MENU* ❖ ══╗
+    const buttonsMessage = {
+      templateMessage: {
+        hydratedTemplate: {
+          hydratedContentText: `╔══ ❖  *📚 DANUWA-MD MENU* ❖ ══╗
 
 📝  Term Test Papers (Grade 6–13)
 📘  GCE O/L Past Papers
@@ -19,33 +22,40 @@ async (conn, mek, m, { from, quoted, reply }) => {
 ╚═══════════════════════╝
 
 ⚡ *Powered By:* ©DANUWA-MD ❤️`,
-      footer: "Select an option below",
-      templateButtons: [
-        {
-          quickReplyButton: {
-            displayText: "📘 Term Test",
-            id: ".termtest"
-          }
-        },
-        {
-          quickReplyButton: {
-            displayText: "📄 O/L Papers",
-            id: ".olpast"
-          }
-        },
-        {
-          quickReplyButton: {
-            displayText: "📗 A/L Papers",
-            id: ".alpast"
-          }
+          hydratedFooterText: "Select an option below",
+          hydratedButtons: [
+            {
+              quickReplyButton: {
+                displayText: "📘 Term Test",
+                id: ".termtest"
+              }
+            },
+            {
+              quickReplyButton: {
+                displayText: "📄 O/L Papers",
+                id: ".olpast"
+              }
+            },
+            {
+              quickReplyButton: {
+                displayText: "📗 A/L Papers",
+                id: ".alpast"
+              }
+            }
+          ]
         }
-      ]
+      }
     };
 
-    await conn.sendMessage(from, message, { quoted: mek });
+    const message = await generateWAMessageFromContent(from, proto.Message.fromObject(buttonsMessage), {
+      userJid: conn.user.id,
+      quoted: mek,
+    });
+
+    await conn.relayMessage(from, message.message, { messageId: message.key.id });
 
   } catch (err) {
-    console.error("❌ Error sending template buttons:", err);
-    reply("❌ Something went wrong:\n" + err.message);
+    console.error("❌ Error sending button message:", err);
+    reply(`❌ Error:\n${err.message}`);
   }
 });
