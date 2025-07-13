@@ -12,7 +12,7 @@ async (conn, mek, m, {
     from, quoted, reply
 }) => {
     try {
-        const bannerImg = 'https://i.imgur.com/B3KTpLW.jpeg';
+        const bannerImg = 'https://github.com/dcd21865/DANUWA-BOT/blob/main/images/alive.png?raw=true';
 
         const channelJid = '120363418166326365@newsletter'; // your newsletter JID
         const channelName = '🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁';
