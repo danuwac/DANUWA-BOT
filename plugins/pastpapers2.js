@@ -15,7 +15,7 @@ const pendingGovDoc = {};
 
 // Step 1: Fetch post list
 async function fetchGovdocPosts(gradeSlug) {
-  const url = https://govdoc.lk/category/term-test-papers/${gradeSlug};
+  const url = `https://govdoc.lk/category/term-test-papers/${gradeSlug}`;
   const res = await axios.get(url, { headers });
   const $ = cheerio.load(res.data);
   const posts = [];
@@ -63,7 +63,7 @@ cmd(
     const posts = await fetchGovdocPosts(gradeSlug);
     if (!posts.length) return reply(❌ No papers found for *${gradeSlug}*);
 
-    let msg = 📚 *GovDoc ${gradeSlug.toUpperCase()} Term Test Papers*\n────────────────────\n_Reply with number to select paper_\n\n;
+    let msg = `📚 *GovDoc ${gradeSlug.toUpperCase()} Term Test Papers*\n────────────────────\n_Reply with number to select paper_\n\n`;
     posts.forEach((post, i) => {
       msg += *${i + 1}.* ${post.title}\n;
     });
