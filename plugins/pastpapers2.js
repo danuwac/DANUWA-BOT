@@ -13,7 +13,7 @@ const headers = {
 
 const pendingGovDoc = {};
 
-// Step 1: Fetch paper list
+// Step 1: Fetch post list
 async function fetchGovdocPosts(gradeSlug) {
   const url = `https://govdoc.lk/category/term-test-papers/${gradeSlug}`;
   const res = await axios.get(url, { headers });
@@ -29,7 +29,7 @@ async function fetchGovdocPosts(gradeSlug) {
   return posts.slice(0, 20);
 }
 
-// Command: .govdoc grade 11
+// Step 1: User inputs grade
 cmd(
   {
     pattern: "govdoc",
@@ -39,15 +39,28 @@ cmd(
     filename: __filename,
   },
   async (robin, mek, m, { from, q, sender, reply }) => {
-    if (!q) return reply("❌ Please provide a grade. Example: `.govdoc grade 11`");
+    if (!q) return reply("❌ Please provide a grade. Example: `.govdoc grade 11` or `.govdoc 10`");
 
     await m.react("📚");
-    const gradeSlug = q.toLowerCase().replace(/\s+/g, "-");
+
+    let input = q.trim().toLowerCase();
+    let parts = input.split(/\s+/);
+    let gradeSlug = "";
+
+    if (parts.length === 1 && /^\d{1,2}$/.test(parts[0])) {
+      gradeSlug = `grade-${parts[0]}`;
+    } else if (parts[0] === "grade" && /^\d{1,2}$/.test(parts[1])) {
+      gradeSlug = `grade-${parts[1]}`;
+    } else if (/^grade-\d{1,2}$/.test(parts[0])) {
+      gradeSlug = parts[0];
+    } else {
+      return reply("❌ Invalid grade format. Try `.govdoc 11` or `.govdoc grade 11`");
+    }
+
     const posts = await fetchGovdocPosts(gradeSlug);
+    if (!posts.length) return reply(`❌ No papers found for *${gradeSlug}*`);
 
-    if (!posts.length) return reply(`❌ No papers found for *${q}*`);
-
-    let msg = `📚 *GovDoc ${q.toUpperCase()} Term Test Papers*\n────────────────────\n_Reply with number to select paper_\n\n`;
+    let msg = `📚 *GovDoc ${gradeSlug.toUpperCase()} Term Test Papers*\n────────────────────\n_Reply with number to select paper_\n\n`;
     posts.forEach((post, i) => {
       msg += `*${i + 1}.* ${post.title}\n`;
     });
@@ -62,7 +75,7 @@ cmd(
   }
 );
 
-// Step 2: Select paper
+// Step 2: User selects a paper
 cmd(
   {
     filter: (text, { sender }) =>
@@ -121,7 +134,7 @@ cmd(
   }
 );
 
-// Step 3: Puppeteer file download
+// Step 3: Download PDF with Puppeteer
 cmd(
   {
     filter: (text, { sender }) =>
@@ -156,7 +169,7 @@ cmd(
       await page.waitForSelector('a.btn.w-100[href*="/download/"]', { timeout: 15000 });
       await page.click('a.btn.w-100[href*="/download/"]');
 
-      // Wait for file to download (max 20s)
+      // Wait for file to download
       let fileName;
       for (let i = 0; i < 20; i++) {
         const files = fs.readdirSync(downloadDir).filter(f => f.endsWith(".pdf"));
@@ -175,7 +188,6 @@ cmd(
 
       const filePath = path.join(downloadDir, fileName);
       const pdfBuffer = fs.readFileSync(filePath);
-
       const niceName = `${pending.selected.title} - ${lang.lang}.pdf`;
 
       await robin.sendMessage(
