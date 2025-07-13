@@ -9,59 +9,40 @@ cmd({
 },
 async (conn, mek, m, { from, reply }) => {
     try {
-        // Method 1: Native Interactive Message (Best Success Rate)
-        const buttonMsg = {
-            text: "📌 *DANUWA-MD BUTTON TEST* 📌\nPlease select an option:",
-            footer: "Powered by DANUWA-MD",
+        // SIMPLE BUTTONS (Highest success rate)
+        await conn.sendMessage(from, {
+            text: "📌 *DANUWA-MD BUTTON TEST*",
+            footer: "Tap a button below",
             buttons: [
-                { buttonId: 'opt1', buttonText: { displayText: '🛠️ Settings' }, type: 1 },
-                { buttonId: 'opt2', buttonText: { displayText: 'ℹ️ Info' }, type: 1 },
-                { buttonId: 'opt3', buttonText: { displayText: '🚀 Features' }, type: 1 }
+                { buttonId: 'id1', buttonText: { displayText: '⚙️ Settings' }, type: 1 },
+                { buttonId: 'id2', buttonText: { displayText: '📊 Stats' }, type: 1 }
             ],
             headerType: 1
-        };
+        });
 
-        await conn.sendMessage(from, buttonMsg, { quoted: mek });
-
-        // Method 2: List Message (Alternative)
-        const listMsg = {
-            text: "📋 *DANUWA-MD MENU*",
-            title: "MAIN OPTIONS",
-            footer: "Select an option below",
-            buttonText: "CLICK TO VIEW",
+        // LIST MESSAGE (Alternative)
+        await conn.sendMessage(from, {
+            text: "📋 MAIN MENU",
+            title: "DANUWA-MD OPTIONS",
             sections: [
                 {
-                    title: "⚙️ BOT CONTROLS",
+                    title: "🔧 TOOLS",
                     rows: [
-                        { title: "🔧 Settings", description: "Bot configuration", rowId: "settings" },
-                        { title: "📊 Stats", description: "Bot statistics", rowId: "stats" }
-                    ]
-                },
-                {
-                    title: "ℹ️ INFORMATION",
-                    rows: [
-                        { title: "📝 Help", description: "Show help menu", rowId: "help" },
-                        { title: "💡 About", description: "About this bot", rowId: "about" }
+                        { title: "Settings", rowId: "row1" },
+                        { title: "Statistics", rowId: "row2" }
                     ]
                 }
-            ]
-        };
-
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        await conn.sendMessage(from, listMsg, { quoted: mek });
+            ],
+            buttonText: "VIEW OPTIONS"
+        }, { quoted: mek });
 
     } catch (err) {
         console.error("🔴 BUTTON ERROR:", err);
-        // Fallback to text menu if buttons fail
-        const textMenu = `
-📌 *DANUWA-MD MENU* (Text Fallback)
-
-1. 🛠️ Settings - .settings
-2. ℹ️ Info - .info
-3. 🚀 Features - .features
-
-Reply with the number of your choice.
-        `;
-        await reply(textMenu);
+        // Fallback text menu
+        await reply(`
+📌 *TEXT MENU (Fallback)*
+1. ⚙️ Settings - type .settings
+2. 📊 Stats - type .stats
+        `);
     }
 });
