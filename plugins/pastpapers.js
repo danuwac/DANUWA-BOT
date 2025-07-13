@@ -218,7 +218,7 @@ ${subject ? `📖 Subject: *${EXAM_TYPES[examType].subjects[subject]}*\n` : ''}
           msg.message.extendedTextMessage.contextInfo?.stanzaId !== sentMsg.key.id) return;
 
       const selectedNum = parseInt(msg.message.extendedTextMessage.text.trim());
-      if (isNaN(selectedNum) {
+      if (isNaN(selectedNum)) {
         await conn.sendMessage(from, { 
           text: '❌ Please reply with a number from the list.',
           quoted: msg
