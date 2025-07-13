@@ -64,33 +64,3 @@ async (conn, mek, m, { from, reply }) => {
         reply(`❌ Error: ${err.message}`);
     }
 });
-
-// Handle button responses
-module.exports.handleBotButtons = async (conn, msg) => {
-    try {
-        const from = msg.key.remoteJid;
-        const buttonId = msg.message?.interactiveResponseMessage?.selectedButtonId;
-        
-        if (buttonId) {
-            let responseText = '';
-            
-            switch(buttonId) {
-                case 'btn1':
-                    responseText = '🌟 You pressed Button 1! Thanks for testing!';
-                    break;
-                case 'btn2':
-                    responseText = '🔔 You pressed Button 2! Great choice!';
-                    break;
-                case 'btn3':
-                    responseText = '🌀 You pressed Button 3! Awesome!';
-                    break;
-                default:
-                    responseText = '⚠️ Unknown button pressed';
-            }
-            
-            await conn.sendMessage(from, { text: responseText });
-        }
-    } catch (err) {
-        console.error('Button handler error:', err);
-    }
-};
