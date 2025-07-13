@@ -48,7 +48,7 @@ async function fetchSinglePastPaperPage(url) {
 // Step 1: Command `.pastpapers 2023 ict`
 cmd(
   {
-    pattern: "pastpapers",
+    pattern: "pastol",
     react: "📄",
     desc: "Get O/L past papers by year and subject from govdoc.lk",
     category: "education",
