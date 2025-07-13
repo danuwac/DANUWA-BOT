@@ -4,35 +4,44 @@ const cheerio = require('cheerio');
 
 const BASE_URL = "https://pastpapers.wiki";
 
+const headers = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Referer': 'https://google.com'
+};
+
 async function searchPapers(query) {
   try {
-    const res = await axios.get(`${BASE_URL}/?s=${encodeURIComponent(query)}`);
+    const res = await axios.get(`${BASE_URL}/?s=${encodeURIComponent(query)}`, {
+      headers,
+      maxRedirects: 5,
+    });
+
     const $ = cheerio.load(res.data);
     const papers = [];
 
-    $('article').each((i, el) => {
-      const title = $(el).find('.entry-title a').text().trim();
-      const link = $(el).find('.entry-title a').attr('href');
-      const thumbnail = $(el).find('img').attr('src') || null;
-      if (title && link) papers.push({ title, link, thumbnail });
+    $('h2.entry-title a').each((i, el) => {
+      const title = $(el).text().trim();
+      const link = $(el).attr('href');
+      if (title && link) papers.push({ title, link });
     });
 
     return papers;
   } catch (err) {
-    console.error("Search error:", err.message);
+    console.error("❌ Search error:", err.message);
     return [];
   }
 }
 
 async function getDownloadLink(paperUrl) {
   try {
-    const res = await axios.get(paperUrl);
+    const res = await axios.get(paperUrl, { headers });
     const $ = cheerio.load(res.data);
     const iframe = $('iframe').attr('src');
     if (!iframe) return null;
     return iframe.startsWith('http') ? iframe : `${BASE_URL}${iframe}`;
   } catch (err) {
-    console.error("Link error:", err.message);
+    console.error("❌ Link error:", err.message);
     return null;
   }
 }
@@ -40,11 +49,11 @@ async function getDownloadLink(paperUrl) {
 cmd({
   pattern: "pastpaper",
   alias: ["papers", "exam"],
-  use: ".pastpaper <subject/year/grade>",
+  use: ".pastpaper <subject/year>",
   desc: "Search Sri Lankan past papers",
   category: "education",
   filename: __filename
-}, async (conn, mek, m, { from, args, q, reply }) => {
+}, async (conn, mek, m, { from, q, reply }) => {
   try {
     if (!q) return reply("🔍 Please provide a subject, grade, or year to search past papers.");
     await m.react("📚");
@@ -52,7 +61,7 @@ cmd({
     const results = await searchPapers(q);
     if (!results.length) return reply("❌ No past papers found for your query.");
 
-    let msgText = `📚 *PAST PAPERS MATCHED* 📚\n─────────────────────────\n_Reply with the number to download a paper._\n\n`;
+    let msgText = `📚 *PAST PAPERS FOUND* 📚\n───────────────────────\n_Reply with number to download_\n\n`;
     results.forEach((paper, i) => {
       msgText += `*${i + 1}.* ${paper.title}\n`;
     });
@@ -79,7 +88,7 @@ cmd({
           document: { url: pdfUrl },
           mimetype: "application/pdf",
           fileName: `${results[selected].title}.pdf`,
-          caption: `📄 *${results[selected].title}*\n✅ Past paper downloaded successfully.`,
+          caption: `📄 *${results[selected].title}*\n✅ Past paper sent successfully.`,
         }, { quoted: msg1 });
 
         await conn.sendMessage(from, { react: { text: "✅", key: msg1.key } });
