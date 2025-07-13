@@ -8,7 +8,7 @@ cmd(
     category: "education",
     filename: __filename,
   },
-  async (conn, m, { from }) => {
+  async (conn, m) => {
     const menuText = `
 ╔══ ❖  *📚 DANUWA-MD MENU* ❖ ══╗
 
@@ -22,7 +22,9 @@ cmd(
 `;
 
     try {
-      await conn.sendMessage(from, {
+      console.log("📩 Sending to:", m.chat);
+
+      await conn.sendMessage(m.chat, {
         text: menuText,
         footer: "📘 Choose a category",
         buttons: [
@@ -32,6 +34,7 @@ cmd(
         ],
         headerType: 1,
       }, { quoted: m });
+
     } catch (err) {
       console.error("❌ Error sending button message:", err);
     }
