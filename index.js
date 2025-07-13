@@ -234,7 +234,7 @@ async function connectToWA() {
       : mek.message[type]?.text || mek.message[type]?.caption || '';
 
     if (body === ".testbtn") {
-      await sock.sendMessage(from, {
+      await conn.sendMessage(from, {
         text: "🧪 *Test Buttons*",
         footer: "If you see this, buttons are working ✅",
         buttons: [
