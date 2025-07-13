@@ -36,7 +36,7 @@ const pendingPastPaper = {};
 // 📥 Step 1: User types `.pastpapers 2023 bas`
 cmd(
   {
-    pattern: "pastpapers",
+    pattern: "pastol",
     desc: "Download O/L past papers from govdoc.lk",
     category: "education",
     react: "📄",
