@@ -177,6 +177,40 @@ async function connectToWA() {
       }
     }
 
+    if (mek.message?.interactiveResponseMessage) {
+      try {
+        const buttonId = mek.message.interactiveResponseMessage?.selectedButtonId;
+        const listId = mek.message?.listResponseMessage?.title;
+        
+        if (buttonId || listId) {
+          const from = mek.key.remoteJid;
+          let responseText = '';
+          
+          if (buttonId) {
+            switch(buttonId) {
+              case 'btn1':
+                responseText = '🌟 You pressed Button 1! Thanks for testing!';
+                break;
+              case 'btn2':
+                responseText = '🔔 You pressed Button 2! Great choice!';
+                break;
+              case 'btn3':
+                responseText = '🌀 You pressed Button 3! Awesome!';
+                break;
+              default:
+                responseText = '⚠️ Unknown button pressed';
+            }
+          } else if (listId) {
+            responseText = `📋 You selected: ${listId}`;
+          }
+          
+          await conn.sendMessage(from, { text: responseText }, { quoted: mek });
+        }
+      } catch (err) {
+        console.error('Button handler error:', err);
+      }
+    }
+
     // Run plugins onMessage hooks
     if (global.pluginHooks) {
       for (const plugin of global.pluginHooks) {
