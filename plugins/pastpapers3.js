@@ -11,9 +11,7 @@ const headers = {
   "Accept-Language": "en-US,en;q=0.9",
 };
 
-const pendingOLPapers = {};
-
-// Subject short forms to slugs
+// Short forms to full slugs
 const subjectAliases = {
   bas: "business-accounting-studies",
   ict: "information-and-communication-technology",
@@ -33,76 +31,35 @@ const subjectAliases = {
   media: "communication-and-media-studies"
 };
 
-// Fetch paper from full URL
-async function fetchSinglePastPaperPage(url) {
-  const res = await axios.get(url, { headers });
-  const $ = cheerio.load(res.data);
-  const title = $("h1.entry-title").text().trim();
+const pendingPastPaper = {};
 
-  return {
-    title,
-    link: url,
-  };
-}
-
-// Step 1: Command `.pastpapers 2023 ict`
+// 📥 Step 1: User types `.pastpapers 2023 bas`
 cmd(
   {
-    pattern: "pastol",
-    react: "📄",
-    desc: "Get O/L past papers by year and subject from govdoc.lk",
+    pattern: "pastpapers",
+    desc: "Download O/L past papers from govdoc.lk",
     category: "education",
+    react: "📄",
     filename: __filename,
   },
   async (robin, mek, m, { from, q, sender, reply }) => {
-    if (!q) return reply("❌ Format: `.pastpapers <year> <subject>`");
+    if (!q) return reply("❌ Usage: `.pastpapers <year> <subject>`\nExample: `.pastpapers 2023 bas`");
 
     const parts = q.trim().toLowerCase().split(/\s+/);
-    if (parts.length < 2) return reply("❌ Format: `.pastpapers <year> <subject>`");
+    if (parts.length < 2) return reply("❌ You must provide both year and subject.");
 
     const year = parts[0];
-    const rawSubject = parts.slice(1).join("-").replace(/\s+/g, "-");
-    const mappedSubject = subjectAliases[rawSubject] || rawSubject;
-    const url = `https://govdoc.lk/gce-ordinary-level-exam-${year}-${mappedSubject}-past-papers`;
-
-    await m.react("📄");
+    const subjectKey = parts.slice(1).join("-").replace(/\s+/g, "-");
+    const subjectSlug = subjectAliases[subjectKey] || subjectKey;
+    const postUrl = `https://govdoc.lk/gce-ordinary-level-exam-${year}-${subjectSlug}-past-papers`;
 
     try {
-      const post = await fetchSinglePastPaperPage(url);
-
-      if (!post || !post.title) return reply("❌ No matching past paper found.");
-
-      let msg = `📄 *${post.title}*\n────────────────────\n_Reply with number to select language:_\n\n1. Open paper`;
-
-      await robin.sendMessage(from, { text: msg }, { quoted: mek });
-
-      pendingOLPapers[sender] = {
-        step: "select",
-        result: post,
-        quoted: mek,
-      };
-    } catch (e) {
-      console.error("Fetch error:", e.message);
-      return reply("⚠️ Could not fetch past paper page. Check year and subject.");
-    }
-  }
-);
-
-// Step 2: User replies with 1 to open language options
-cmd(
-  {
-    filter: (text, { sender }) =>
-      pendingOLPapers[sender] && pendingOLPapers[sender].step === "select" && text.trim() === "1",
-  },
-  async (robin, mek, m, { from, sender, reply }) => {
-    const pending = pendingOLPapers[sender];
-    const selectedResult = pending.result;
-
-    try {
-      const { data } = await axios.get(selectedResult.link, { headers });
+      const { data } = await axios.get(postUrl, { headers });
       const $ = cheerio.load(data);
 
+      const title = $("h1.entry-title").text().trim();
       const languages = [];
+
       $("a[href*='/view?id=']").each((_, el) => {
         const lang = $(el).find("button").text().trim();
         const href = $(el).attr("href");
@@ -115,40 +72,40 @@ cmd(
       });
 
       if (!languages.length) {
-        delete pendingOLPapers[sender];
-        return reply("⚠️ No language options found.");
+        return reply("⚠️ No language options found for that paper.");
       }
 
-      let msg = `🌐 *Languages for:* _${selectedResult.title}_\n\n`;
+      let msg = `📄 *${title}*\n\n🌐 *Available Languages:*\n`;
       languages.forEach((l, i) => {
         msg += `*${i + 1}.* ${l.lang}\n`;
       });
-      msg += `\n_Reply with number (1-${languages.length}) to download._`;
+      msg += `\n_Reply with a number to download that version._`;
 
-      pendingOLPapers[sender] = {
+      pendingPastPaper[sender] = {
         step: "download",
-        selected: selectedResult,
+        title,
         languages,
         quoted: mek,
       };
 
-      reply(msg);
+      await robin.sendMessage(from, { text: msg }, { quoted: mek });
     } catch (e) {
-      console.error(e);
-      reply("⚠️ Failed to load language options.");
-      delete pendingOLPapers[sender];
+      console.error("❌ Failed to fetch page:", e.message);
+      return reply("❌ Invalid year or subject, or paper not found.");
     }
   }
 );
 
-// Step 3: Puppeteer download
+// 📥 Step 2: User replies with a number to choose language
 cmd(
   {
     filter: (text, { sender }) =>
-      pendingOLPapers[sender] && pendingOLPapers[sender].step === "download" && /^\d+$/.test(text.trim()),
+      pendingPastPaper[sender] &&
+      pendingPastPaper[sender].step === "download" &&
+      /^\d+$/.test(text.trim()),
   },
-  async (robin, mek, m, { from, body, sender, reply }) => {
-    const pending = pendingOLPapers[sender];
+  async (robin, mek, m, { from, sender, body, reply }) => {
+    const pending = pendingPastPaper[sender];
     const selected = parseInt(body.trim());
 
     if (selected < 1 || selected > pending.languages.length) {
@@ -156,7 +113,7 @@ cmd(
     }
 
     const lang = pending.languages[selected - 1];
-    const downloadDir = path.join(os.tmpdir(), `ol-papers-${Date.now()}`);
+    const downloadDir = path.join(os.tmpdir(), `olpaper-${Date.now()}`);
 
     try {
       fs.mkdirSync(downloadDir);
@@ -188,16 +145,16 @@ cmd(
 
       await browser.close();
 
-      if (!fileName) throw new Error("Download did not start in time.");
+      if (!fileName) throw new Error("Download did not complete.");
 
       const filePath = path.join(downloadDir, fileName);
-      const pdfBuffer = fs.readFileSync(filePath);
-      const niceName = `${pending.selected.title} - ${lang.lang}.pdf`;
+      const buffer = fs.readFileSync(filePath);
+      const niceName = `${pending.title} - ${lang.lang}.pdf`;
 
       await robin.sendMessage(
         from,
         {
-          document: pdfBuffer,
+          document: buffer,
           mimetype: "application/pdf",
           fileName: niceName,
         },
@@ -206,11 +163,11 @@ cmd(
 
       fs.unlinkSync(filePath);
       fs.rmdirSync(downloadDir);
-      delete pendingOLPapers[sender];
+      delete pendingPastPaper[sender];
     } catch (e) {
       console.error("❌ Puppeteer download failed:", e.message);
-      reply("⚠️ Failed to download PDF. It may have timed out or failed.");
-      delete pendingOLPapers[sender];
+      reply("⚠️ Failed to download PDF. It may have timed out.");
+      delete pendingPastPaper[sender];
     }
   }
 );
