@@ -44,8 +44,20 @@ cmd(
     if (!q) return reply("❌ Please provide a subject. Example: `.pastpapers biology`");
 
     await m.react("📄");
+    const subjectAliases = {
+      sft: "science-for-technology",
+      et: "engineering-technology",
+      bst: "bio-systems-technology",
+      bio: "biology",
+      agri: "agriculture",
+      ict: "information-and-communication-technology",
+      eng: "general-english",
+      econ: "economics",
+    };
 
-    const subjectSlug = q.trim().toLowerCase().replace(/\s+/g, "-");
+    const rawInput = q.trim().toLowerCase();
+    const subjectSlug = subjectAliases[rawInput] || rawInput.replace(/\s+/g, "-");
+
     const posts = await fetchSubjectPapers(subjectSlug);
     if (!posts.length) return reply(`❌ No past papers found for *${q}*`);
 
