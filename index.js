@@ -189,6 +189,22 @@ async function connectToWA() {
         }
       }
     }
+
+    if (body === ".testbtn") {
+      await sock.sendMessage(from, {
+        text: "🧪 *Test Buttons*",
+        footer: "If you see this, buttons are working ✅",
+        buttons: [
+          {
+            buttonId: ".hello",
+            buttonText: { displayText: "👋 Say Hello" },
+            type: 1,
+          },
+        ],
+        headerType: 1,
+      }, { quoted: m });
+    }
+
     
     mek.message = (getContentType(mek.message) === 'ephemeralMessage') 
       ? mek.message.ephemeralMessage.message 
