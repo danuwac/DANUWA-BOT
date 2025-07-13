@@ -69,23 +69,25 @@ _Reply with 1, 2, or 3 to continue._`;
 // Step 2: handle reply to menu (must reply to same msg)
 cmd(
   {
-    filter: (text, { sender, quotedMsg }) =>
-      paperFlow[sender] &&
-      paperFlow[sender].step === "menu" &&
-      /^[1-3]$/.test(text.trim()) &&
-      quotedMsg?.key?.id === paperFlow[sender]?.menuMsgId, // make sure it's a reply to menu
+    filter: (text, { sender }) => {
+      return (
+        paperFlow[sender] &&
+        paperFlow[sender].step === "menu" &&
+        /^[1-3]$/.test(text.trim())
+      );
+    },
   },
   async (robin, mek, m, { sender, reply }) => {
     const option = parseInt(m.text.trim());
 
     if (option === 1) {
-      reply("📥 Enter grade and subject (e.g., `10 ict`)");
+      await reply("📥 Enter grade and subject (e.g., `10 ict`)");
       paperFlow[sender] = { step: "input", type: "term", quoted: mek };
     } else if (option === 2) {
-      reply("📥 Enter year and subject (e.g., `2024 ict`)");
+      await reply("📥 Enter year and subject (e.g., `2024 ict`)");
       paperFlow[sender] = { step: "input", type: "ol", quoted: mek };
     } else if (option === 3) {
-      reply("📥 Enter subject only (e.g., `biology`)");
+      await reply("📥 Enter subject only (e.g., `biology`)");
       paperFlow[sender] = { step: "input", type: "al", quoted: mek };
     } else {
       reply("❌ Invalid selection.");
