@@ -41,14 +41,14 @@ async function fetchGovdocPosts(slug) {
     const url =
       page === 1
         ? `https://govdoc.lk/category/term-test-papers/${slug}`
-        : `https://govdoc.lk/category/term-test-papers/${slug}/page/${page}`;
+        : `https://govdoc.lk/category/term-test-papers/${slug}?page=${page}`;
 
     try {
       const res = await axios.get(url, { headers });
       const $ = cheerio.load(res.data);
 
       const cards = $("a.custom-card");
-      if (cards.length === 0) break; // no more posts
+      if (cards.length === 0) break;
 
       let newPosts = 0;
 
@@ -62,10 +62,10 @@ async function fetchGovdocPosts(slug) {
         }
       });
 
-      if (newPosts === 0) break; // No new posts = done
+      if (newPosts === 0) break;
       page++;
     } catch (err) {
-      console.error(`❌ Failed to fetch page ${page}:`, err.message);
+      console.error(`❌ Failed on page ${page}:`, err.message);
       break;
     }
   }
