@@ -13,15 +13,33 @@ const headers = {
 
 const pendingGovDoc = {};
 
-// Step 1: Fetch post list
-async function fetchGovdocPosts(gradeSlug) {
-  const url = `https://govdoc.lk/category/term-test-papers/${gradeSlug}`;
+// 🧠 Subject short forms to slugs
+const subjectAliases = {
+  ict: "information-communication-technology",
+  sft: "science-for-technology",
+  et: "engineering-technology",
+  bst: "bio-systems-technology",
+  agri: "agriculture",
+  hist: "history",
+  eng: "english",
+  sin: "sinhala",
+  tam: "tamil",
+  maths: "mathematics",
+  sci: "science",
+  comm: "commerce",
+  acc: "accounting",
+  bus: "business-studies",
+  // Add more as needed...
+};
+
+// 📥 Step 1: Fetch post list by slug
+async function fetchGovdocPosts(slug) {
+  const url = `https://govdoc.lk/category/term-test-papers/${slug}`;
   const res = await axios.get(url, { headers });
   const $ = cheerio.load(res.data);
   const posts = [];
 
   $("a.custom-card").each((_, el) => {
-    // ⛔ Exclude links inside "Related Pages" or promotional blocks
     if ($(el).closest(".info-body").length > 0) return;
 
     const link = $(el).attr("href");
@@ -32,34 +50,42 @@ async function fetchGovdocPosts(gradeSlug) {
   return posts.slice(0, 20);
 }
 
-
-// Step 1: User inputs grade
+// 🧾 Step 1: User input command
 cmd(
   {
     pattern: "govdoc",
     react: "📚",
-    desc: "Get term test papers from govdoc.lk",
+    desc: "Get term test papers by grade + subject",
     category: "education",
     filename: __filename,
   },
   async (robin, mek, m, { from, q, sender, reply }) => {
-    if (!q) return reply("❌ Please provide a grade. Example: `.govdoc grade 11` or `.govdoc 10`");
+    if (!q) return reply("❌ Example: `.govdoc 10 history` or `.govdoc grade 11 ict`");
 
     await m.react("📚");
 
-    let input = q.trim().toLowerCase();
-    let parts = input.split(/\s+/);
-    let gradeSlug = "";
+    const input = q.trim().toLowerCase().split(/\s+/);
+    let grade = "";
+    let subject = "";
 
-    if (parts.length === 1 && /^\d{1,2}$/.test(parts[0])) {
-      gradeSlug = `grade-${parts[0]}`;
-    } else if (parts[0] === "grade" && /^\d{1,2}$/.test(parts[1])) {
-      gradeSlug = `grade-${parts[1]}`;
-    } else if (/^grade-\d{1,2}$/.test(parts[0])) {
-      gradeSlug = parts[0];
+    if (input.length === 1 && /^\d{1,2}$/.test(input[0])) {
+      grade = input[0];
+    } else if (input[0] === "grade" && /^\d{1,2}$/.test(input[1])) {
+      grade = input[1];
+      subject = input.slice(2).join("-");
+    } else if (/^\d{1,2}$/.test(input[0])) {
+      grade = input[0];
+      subject = input.slice(1).join("-");
     } else {
-      return reply("❌ Invalid grade format. Try `.govdoc 11` or `.govdoc grade 11`");
+      return reply("❌ Invalid format. Try `.govdoc 10 ict` or `.govdoc grade 11 history`");
     }
+
+    // 🧠 Handle subject short forms
+    if (subject && subjectAliases[subject]) {
+      subject = subjectAliases[subject];
+    }
+
+    const gradeSlug = `grade-${grade}${subject ? "-" + subject : ""}`;
 
     const posts = await fetchGovdocPosts(gradeSlug);
     if (!posts.length) return reply(`❌ No papers found for *${gradeSlug}*`);
@@ -138,7 +164,7 @@ cmd(
   }
 );
 
-// Step 3: Download PDF with Puppeteer
+// Step 3: Download PDF
 cmd(
   {
     filter: (text, { sender }) =>
@@ -173,7 +199,6 @@ cmd(
       await page.waitForSelector('a.btn.w-100[href*="/download/"]', { timeout: 15000 });
       await page.click('a.btn.w-100[href*="/download/"]');
 
-      // Wait for file to download
       let fileName;
       for (let i = 0; i < 20; i++) {
         const files = fs.readdirSync(downloadDir).filter(f => f.endsWith(".pdf"));
@@ -186,9 +211,7 @@ cmd(
 
       await browser.close();
 
-      if (!fileName) {
-        throw new Error("Download did not start in time.");
-      }
+      if (!fileName) throw new Error("Download did not start in time.");
 
       const filePath = path.join(downloadDir, fileName);
       const pdfBuffer = fs.readFileSync(filePath);
