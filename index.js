@@ -236,14 +236,9 @@ async function connectToWA() {
       await conn.sendMessage(from, {
         text: "🧪 *Test Buttons*",
         footer: "If you see this, buttons are working ✅",
-        buttons: [
-          {
-            buttonId: ".hello",
-            buttonText: { displayText: "👋 Say Hello" },
-            type: 1,
-          },
-        ],
-        headerType: 1,
+        templateButtons: [
+          { index: 1, quickReplyButton: { displayText: "👋 Say Hello", id: ".hello" } },
+        ]
       }, { quoted: mek });
     }
 
