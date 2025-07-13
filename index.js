@@ -310,23 +310,6 @@ async function connectToWA() {
       } else return jid;
     };
 
-    // Add this right after your media download section
-// Interactive Message Handler
-    conn.ev.on('messages.upsert', ({ messages }) => {
-      const msg = messages[0];
-    
-    // Handle button clicks
-      if (msg?.message?.interactiveResponseMessage) {
-        const response = `You clicked: ${msg.message.interactiveResponseMessage.selectedButtonId}`;
-        conn.sendMessage(msg.key.remoteJid, { text: response });
-      }
-    
-    // Handle list selections
-      if (msg?.message?.listResponseMessage) {
-        const response = `You selected: ${msg.message.listResponseMessage.title}`;
-        conn.sendMessage(msg.key.remoteJid, { text: response });
-      }
-    });
 
     if (isCmd) {
       const cmd = commands.find((c) => c.pattern === commandName || (c.alias && c.alias.includes(commandName)));
