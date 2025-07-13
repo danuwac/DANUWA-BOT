@@ -13,7 +13,11 @@ async function fetchGovdocPosts(gradeSlug) {
   const $ = cheerio.load(res.data);
   const posts = [];
 
+  // Select only .custom-card <a> NOT inside .info-body (related section)
   $('a.custom-card').each((_, el) => {
+    // Skip if inside .info-body (related)
+    if ($(el).closest('.info-body').length > 0) return;
+
     const link = $(el).attr('href');
     const title = $(el).find('h5.cate-title').text().trim();
     if (link && title) {
@@ -21,7 +25,7 @@ async function fetchGovdocPosts(gradeSlug) {
     }
   });
 
-  return posts.slice(0, 20); // Top 20 posts
+  return posts.slice(0, 20); // top 20 results only
 }
 
 cmd({
