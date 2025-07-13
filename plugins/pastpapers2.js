@@ -1,6 +1,8 @@
 const { cmd } = require("../command");
 const axios = require("axios");
 const cheerio = require("cheerio");
+const { wrapper } = require("axios-cookiejar-support");
+const tough = require("tough-cookie");
 
 const headers = {
   "User-Agent": "Mozilla/5.0",
@@ -9,7 +11,7 @@ const headers = {
 
 const pendingGovDoc = {};
 
-// Step 1: Get paper list by grade
+// Step 1: Fetch paper list by grade
 async function fetchGovdocPosts(gradeSlug) {
   const url = `https://govdoc.lk/category/term-test-papers/${gradeSlug}`;
   const res = await axios.get(url, { headers });
@@ -59,7 +61,7 @@ cmd(
   }
 );
 
-// Step 2: Select paper
+// Step 2: User selects a paper
 cmd(
   {
     filter: (text, { sender }) =>
@@ -118,7 +120,7 @@ cmd(
   }
 );
 
-// Step 3: Download and send PDF
+// Step 3: Download the PDF with proper cookies and headers
 cmd(
   {
     filter: (text, { sender }) =>
@@ -133,11 +135,13 @@ cmd(
     }
 
     const lang = pending.languages[selected - 1];
+    const jar = new tough.CookieJar();
+    const client = wrapper(axios.create({ jar }));
 
     try {
-      // Visit the /view?id=... page to get the real download link
-      const { data: langPage } = await axios.get(lang.link, { headers });
-      const $ = cheerio.load(langPage);
+      // Step 1: Visit view page to store cookies and get download link
+      const langPageResponse = await client.get(lang.link, { headers });
+      const $ = cheerio.load(langPageResponse.data);
 
       const downloadPath = $('a.btn.w-100[href*="/download/"]').attr("href");
       if (!downloadPath) throw new Error("Download link not found");
@@ -146,8 +150,8 @@ cmd(
         ? downloadPath
         : `https://govdoc.lk${downloadPath}`;
 
-      // IMPORTANT: Add Referer header to avoid govdoc.lk protection
-      const downloadResponse = await axios.get(downloadUrl, {
+      // Step 2: Download PDF with Referer and cookies
+      const pdfResponse = await client.get(downloadUrl, {
         headers: {
           ...headers,
           Referer: lang.link,
@@ -155,12 +159,12 @@ cmd(
         responseType: "arraybuffer",
       });
 
-      const contentType = downloadResponse.headers["content-type"];
+      const contentType = pdfResponse.headers["content-type"];
       if (!contentType.includes("pdf")) {
         throw new Error("Not a PDF file. Got: " + contentType);
       }
 
-      const pdfBuffer = Buffer.from(downloadResponse.data);
+      const pdfBuffer = Buffer.from(pdfResponse.data);
       const fileName = `${pending.selected.title} - ${lang.lang}.pdf`;
 
       await robin.sendMessage(
@@ -176,7 +180,7 @@ cmd(
       delete pendingGovDoc[sender];
     } catch (e) {
       console.error("Download failed:", e.message);
-      reply("⚠️ Failed to download or send PDF. It may not be public or accessible at the moment.");
+      reply("⚠️ Failed to download or send PDF. It may not be public or is blocked by govdoc.lk.");
       delete pendingGovDoc[sender];
     }
   }
