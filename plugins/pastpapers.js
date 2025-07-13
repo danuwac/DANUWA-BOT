@@ -270,7 +270,7 @@ ${subject ? `📖 Subject: *${EXAM_TYPES[examType].subjects[subject]}*\n` : ''}
             dlMsg.message.extendedTextMessage.contextInfo?.stanzaId !== downloadMsg.key.id) return;
 
         const selectedLinkNum = parseInt(dlMsg.message.extendedTextMessage.text.trim());
-        if (isNaN(selectedLinkNum) {
+        if (isNaN(selectedLinkNum)) {
           await conn.sendMessage(from, { 
             text: '❌ Please reply with a number from the list.',
             quoted: dlMsg
