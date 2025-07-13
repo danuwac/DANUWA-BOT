@@ -32,6 +32,7 @@ async function fetchGovdocPosts(gradeSlug) {
   return posts.slice(0, 20);
 }
 
+
 // Step 1: User inputs grade
 cmd(
   {
@@ -42,7 +43,7 @@ cmd(
     filename: __filename,
   },
   async (robin, mek, m, { from, q, sender, reply }) => {
-    if (!q) return reply("❌ Please provide a grade. Example: .govdoc grade 11 or .govdoc 10");
+    if (!q) return reply("❌ Please provide a grade. Example: `.govdoc grade 11` or `.govdoc 10`");
 
     await m.react("📚");
 
@@ -51,21 +52,21 @@ cmd(
     let gradeSlug = "";
 
     if (parts.length === 1 && /^\d{1,2}$/.test(parts[0])) {
-      gradeSlug = grade-${parts[0]};
+      gradeSlug = `grade-${parts[0]}`;
     } else if (parts[0] === "grade" && /^\d{1,2}$/.test(parts[1])) {
-      gradeSlug = grade-${parts[1]};
+      gradeSlug = `grade-${parts[1]}`;
     } else if (/^grade-\d{1,2}$/.test(parts[0])) {
       gradeSlug = parts[0];
     } else {
-      return reply("❌ Invalid grade format. Try .govdoc 11 or .govdoc grade 11");
+      return reply("❌ Invalid grade format. Try `.govdoc 11` or `.govdoc grade 11`");
     }
 
     const posts = await fetchGovdocPosts(gradeSlug);
-    if (!posts.length) return reply(❌ No papers found for *${gradeSlug}*);
+    if (!posts.length) return reply(`❌ No papers found for *${gradeSlug}*`);
 
     let msg = `📚 *GovDoc ${gradeSlug.toUpperCase()} Term Test Papers*\n────────────────────\n_Reply with number to select paper_\n\n`;
     posts.forEach((post, i) => {
-      msg += *${i + 1}.* ${post.title}\n;
+      msg += `*${i + 1}.* ${post.title}\n`;
     });
 
     await robin.sendMessage(from, { text: msg }, { quoted: mek });
@@ -105,7 +106,7 @@ cmd(
         if (lang && href) {
           languages.push({
             lang,
-            link: href.startsWith("http") ? href : https://govdoc.lk${href},
+            link: href.startsWith("http") ? href : `https://govdoc.lk${href}`,
           });
         }
       });
@@ -115,11 +116,11 @@ cmd(
         return reply("⚠️ No language options found for this paper.");
       }
 
-      let langMsg = 🌐 *Available Languages for:* _${selectedResult.title}_\n\n;
+      let langMsg = `🌐 *Available Languages for:* _${selectedResult.title}_\n\n`;
       languages.forEach((l, i) => {
-        langMsg += *${i + 1}.* ${l.lang}\n;
+        langMsg += `*${i + 1}.* ${l.lang}\n`;
       });
-      langMsg += \n_Reply with a number (1-${languages.length}) to download._;
+      langMsg += `\n_Reply with a number (1-${languages.length}) to download._`;
 
       pendingGovDoc[sender] = {
         step: "download",
@@ -152,7 +153,7 @@ cmd(
     }
 
     const lang = pending.languages[selected - 1];
-    const downloadDir = path.join(os.tmpdir(), govdoc-${Date.now()});
+    const downloadDir = path.join(os.tmpdir(), `govdoc-${Date.now()}`);
 
     try {
       fs.mkdirSync(downloadDir);
@@ -191,7 +192,7 @@ cmd(
 
       const filePath = path.join(downloadDir, fileName);
       const pdfBuffer = fs.readFileSync(filePath);
-      const niceName = ${pending.selected.title} - ${lang.lang}.pdf;
+      const niceName = `${pending.selected.title} - ${lang.lang}.pdf`;
 
       await robin.sendMessage(
         from,
