@@ -1,42 +1,48 @@
-const { cmd } = require("../command");
+const { cmd } = require('../command');
+const fs = require('fs');
 
-cmd(
-  {
+cmd({
     pattern: "govdocmenu",
-    desc: "GovDoc.lk main menu",
     react: "📚",
+    desc: "Show GovDoc.lk paper menu with newsletter buttons",
     category: "education",
-    filename: __filename,
-  },
-  async (conn, m) => {
-    const menuText = `
-╔══ ❖  *📚 DANUWA-MD MENU* ❖ ══╗
-
-📝  Term Test Papers (Grade 6–13)
-📘  GCE O/L Past Papers
-📗  GCE A/L Past Papers
-
-╚═══════════════════════╝
-
-⚡ *Powered By:* ©DANUWA-MD ❤️
-`;
-
+    filename: __filename
+},
+async (conn, mek, m, {
+    from, quoted, reply
+}) => {
     try {
-      console.log("📩 Sending to:", m.chat);
+        const bannerImg = 'https://i.imgur.com/B3KTpLW.jpeg';
 
-      await conn.sendMessage(m.chat, {
-        text: menuText,
-        footer: "📘 Choose a category",
-        buttons: [
-          { buttonId: ".termtest", buttonText: { displayText: "📘 Term Test" }, type: 1 },
-          { buttonId: ".olpast", buttonText: { displayText: "📄 O/L Papers" }, type: 1 },
-          { buttonId: ".alpast", buttonText: { displayText: "📗 A/L Papers" }, type: 1 }
-        ],
-        headerType: 1,
-      }, { quoted: m });
+        const channelJid = '120363418166326365@newsletter'; // your newsletter JID
+        const channelName = '🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁';
+        const channelInvite = '0029Vb65OhH7oQhap1fG1y3o';
+
+        const menuCaption = `╭───── ❖  *📚 DANUWA-MD MENU* ❖ ─────╮
+│
+│ 📝  Term Test Papers (Grade 6–13)
+│ 📘  GCE O/L Past Papers
+│ 📗  GCE A/L Past Papers
+│
+╰────────────────────────────╯
+⚡ *Powered By:* ©DANUWA-MD ❤️`;
+
+        await conn.sendMessage(from, {
+            image: { url: bannerImg },
+            caption: menuCaption,
+            contextInfo: {
+                forwardingScore: 999,
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: channelJid,
+                    newsletterName: channelName,
+                    serverMessageId: -1
+                }
+            }
+        }, { quoted: mek });
 
     } catch (err) {
-      console.error("❌ Error sending button message:", err);
+        console.error("❌ Error sending govdocmenu:", err);
+        reply(`❌ Error: ${err.message}`);
     }
-  }
-);
+});
