@@ -1,18 +1,17 @@
-const { cmd } = require("../command"); // Adjust path if needed
-const { proto } = require("@whiskeysockets/baileys"); // Baileys import for compatibility
+const { cmd } = require("../command"); // adjust path based on your bot
 
 cmd(
   {
     pattern: "govdocmenu",
-    desc: "GovDoc.lk main menu",
+    desc: "GovDoc main menu",
     react: "📚",
     category: "education",
     filename: __filename,
   },
-  async (robin, mek, m, { from }) => {
+  async (conn, mek, m, { from }) => {
     const message = {
-      text: "📘 *GovDoc.lk Exam Resources*\n\nPlease select a category:",
-      footer: "Powered by Danuwa MD",
+      text: "📘 *GovDoc.lk Exam Resources*\n\nChoose a category below:",
+      footer: "Danuwa MD WhatsApp Bot",
       buttons: [
         {
           buttonId: ".termtest",
@@ -30,9 +29,9 @@ cmd(
           type: 1,
         },
       ],
-      headerType: 1, // 1 = text only
+      headerType: 1, // required!
     };
 
-    await robin.sendMessage(from, message, { quoted: mek });
+    await conn.sendMessage(from, message, { quoted: mek });
   }
 );
