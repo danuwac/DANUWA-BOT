@@ -7,68 +7,70 @@ const headers = {
   'Accept-Language': 'en-US,en;q=0.9',
 };
 
-async function getTermPapers(query) {
+async function fetchValidTermLinks(query) {
   try {
-    const q = query.trim().toLowerCase().replace(/\s+/g, '-');
-    const url = `https://pastpapers.wiki/${q}-term-test-papers/`;
-
+    const cleanQuery = query.trim().toLowerCase().replace(/\s+/g, '-');
+    const url = `https://pastpapers.wiki/${cleanQuery}-term-test-papers/`;
     const res = await axios.get(url, { headers });
     const $ = cheerio.load(res.data);
 
-    const papers = [];
+    const results = [];
     $('ul li a').each((_, el) => {
       const title = $(el).text().trim();
-      const link = $(el).attr('href');
-      if (title && link) papers.push({ title, link });
+      const href = $(el).attr('href');
+      if (title && href && href.includes("term-test")) {
+        results.push({ title, url: href });
+      }
     });
 
-    return papers;
+    return results;
   } catch (err) {
-    console.error("❌ Error scraping term test page:", err.message);
+    console.error("❌ Scrape Error:", err.message);
     return [];
   }
 }
 
 cmd({
-  pattern: 'pastpaper',
-  alias: ['termtest', 'paper'],
-  use: '.pastpaper <grade subject>',
-  desc: 'Download term test past papers (Sri Lanka)',
+  pattern: 'termtest',
+  alias: ['pastpaper', 'papers'],
+  use: '.termtest grade 13 biology',
+  desc: 'Download Sri Lankan term test papers',
   category: 'education',
   filename: __filename
 }, async (conn, mek, m, { from, q, reply }) => {
-  if (!q) return reply('📚 Please provide a query like `grade 11 english`.');
-  await m.react('📖');
+  if (!q) return reply("📚 Please enter something like `.termtest grade 13 biology`");
 
-  const papers = await getTermPapers(q);
-  if (!papers.length) return reply('❌ No term test past papers found.');
+  await m.react("🔍");
 
-  let msgText = `📚 *TERM TEST PAPERS*\n────────────────────\n_Reply with the number to download the paper_\n\n`;
+  const papers = await fetchValidTermLinks(q);
+  if (!papers.length) return reply("❌ No term test papers found for this subject.");
+
+  let msg = `📚 *TERM TEST PAPERS FOUND*\n──────────────────────\n_Reply with the number to download_\n\n`;
   papers.forEach((p, i) => {
-    msgText += `*${i + 1}.* ${p.title}\n`;
+    msg += `*${i + 1}.* ${p.title}\n`;
   });
 
-  const sent = await conn.sendMessage(from, { text: msgText }, { quoted: mek });
+  const sent = await conn.sendMessage(from, { text: msg }, { quoted: mek });
 
   conn.ev.on("messages.upsert", async (msgUpdate) => {
     const msg1 = msgUpdate.messages[0];
     if (!msg1.message?.extendedTextMessage) return;
 
-    const selectedText = msg1.message.extendedTextMessage.text.trim();
+    const replyText = msg1.message.extendedTextMessage.text.trim();
     const isReply = msg1.message.extendedTextMessage.contextInfo?.stanzaId === sent.key.id;
-    const selected = parseInt(selectedText) - 1;
+    const selected = parseInt(replyText) - 1;
 
-    if (!isReply || isNaN(selected) || selected < 0 || selected >= papers.length) return;
+    if (!isReply || selected < 0 || selected >= papers.length) return;
 
-    await conn.sendMessage(from, { react: { text: '📥', key: msg1.key } });
+    await conn.sendMessage(from, { react: { text: "📥", key: msg1.key } });
 
     await conn.sendMessage(from, {
-      document: { url: papers[selected].link },
+      document: { url: papers[selected].url },
       mimetype: "application/pdf",
       fileName: `${papers[selected].title}.pdf`,
-      caption: `📄 *${papers[selected].title}*\n✅ Downloaded successfully.`,
+      caption: `✅ *${papers[selected].title}*\n📄 Term test paper sent successfully.`,
     }, { quoted: msg1 });
 
-    await conn.sendMessage(from, { react: { text: '✅', key: msg1.key } });
+    await conn.sendMessage(from, { react: { text: "✅", key: msg1.key } });
   });
 });
