@@ -2,7 +2,7 @@ const { cmd } = require('../command');
 const axios = require('axios');
 const cheerio = require('cheerio');
 
-const BASE_URL = 'https://e-kalvi.com/category/gce-o-l/';
+const BASE_URL = 'https://e-kalvi.com/category/sinhala-medium/o-l/';
 const headers = {
   'User-Agent': 'Mozilla/5.0',
   'Accept-Language': 'en-US,en;q=0.9',
