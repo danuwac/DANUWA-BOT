@@ -15,21 +15,25 @@ const pendingGovDoc = {};
 
 // 🧠 Subject short forms to slugs
 const subjectAliases = {
-  ict: "information-communication-technology",
-  sft: "science-for-technology",
-  et: "engineering-technology",
-  bst: "bio-systems-technology",
-  agri: "agriculture",
+  commerce: "business-accounting-studies",
+  ict: "information-and-communication-technology-ict",
   hist: "history",
-  eng: "english",
-  sin: "sinhala",
+  geo: "geography",
+  eng: "english-language",
+  sinh: "sinhala",
   tam: "tamil",
-  maths: "mathematics",
-  sci: "science",
-  comm: "commerce",
-  acc: "accounting",
-  bus: "business-studies",
-  // Add more as needed...
+  home: "home-economics",
+  agri: "agriculture",
+  liteng: "literature-english",
+  litsin: "literature-sinhala",
+  littam: "literature-tamil",
+  dmt: "design-mechanical-technology",
+  dct: "design-construction-technology",
+  civ: "civic-education",
+  media: "communication-and-media-studies",
+  dance: "dance",
+  health: "health-physical-education",
+
 };
 
 // 📥 Step 1: Fetch post list by slug
