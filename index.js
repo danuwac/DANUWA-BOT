@@ -232,7 +232,6 @@ async function connectToWA() {
     const body = type === 'conversation'
       ? mek.message.conversation
       : mek.message[type]?.text || mek.message[type]?.caption || '';
-
     if (body === ".testbtn") {
       await conn.sendMessage(from, {
         text: "🧪 *Test Buttons*",
@@ -245,9 +244,8 @@ async function connectToWA() {
           },
         ],
         headerType: 1,
-      }, { quoted: m });
+      }, { quoted: mek });
     }
-
 
     const isCmd = body.startsWith(prefix);
     const commandName = isCmd ? body.slice(prefix.length).trim().split(" ")[0].toLowerCase() : '';
