@@ -91,7 +91,15 @@ cmd(
     const gradeSlug = subject
       ? `grade-${grade}/${subject}`
       : `grade-${grade}`;
-    const posts = await fetchGovdocPosts(gradeSlug);
+    let posts = await fetchGovdocPosts(`grade-${grade}`);
+
+    if (subject) {
+
+      posts = posts.filter(p =>
+        p.title.toLowerCase().includes(subject.replace(/-/g, " "))
+                          );
+    }
+
     if (!posts.length) return reply(`❌ No papers found for *${gradeSlug}*`);
 
     let msg = `📚 *GovDoc ${gradeSlug.toUpperCase()} Term Test Papers*\n────────────────────\n_Reply with number to select paper_\n\n`;
