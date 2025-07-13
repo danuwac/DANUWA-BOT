@@ -2,15 +2,15 @@ const { cmd } = require("../command");
 
 cmd(
   {
-    pattern: "govdocmenu",
-    desc: "GovDoc main menu",
+    pattern: "govdoc",
+    desc: "GovDoc.lk main menu",
     react: "📚",
     category: "education",
     filename: __filename,
   },
   async (robin, mek, m, { from }) => {
     const message = {
-      text: "📘 *GovDoc.lk Exam Resources*\n\nPlease select a category:",
+      text: "📘 *GovDoc.lk Exam Resources*\n\nChoose a category:",
       footer: "Danuwa MD WhatsApp Bot",
       buttons: [
         {
@@ -29,7 +29,7 @@ cmd(
           type: 1,
         },
       ],
-      headerType: 1,
+      headerType: 1, // use 1 = text header, 4 = image, etc.
     };
 
     await robin.sendMessage(from, message, { quoted: mek });
