@@ -13,7 +13,7 @@ const headers = {
 
 const pendingGovDoc = {};
 
-// 🧠 Subject short forms to slugs
+// 🔠 Subject short forms to slugs
 const subjectAliases = {
   ict: "information-communication-technology",
   sft: "science-for-technology",
@@ -29,28 +29,45 @@ const subjectAliases = {
   comm: "commerce",
   acc: "accounting",
   bus: "business-studies",
-  // Add more as needed...
+  health: "health",
 };
 
-// 📥 Step 1: Fetch post list by slug
-async function fetchGovdocPosts(slug) {
-  const url = `https://govdoc.lk/category/term-test-papers/${slug}`;
-  const res = await axios.get(url, { headers });
-  const $ = cheerio.load(res.data);
+// 🔁 Fetch all posts (multi-page support)
+async function fetchGovdocPosts(slug, maxPages = 3) {
   const posts = [];
 
-  $("a.custom-card").each((_, el) => {
-    if ($(el).closest(".info-body").length > 0) return;
+  for (let page = 1; page <= maxPages; page++) {
+    const url =
+      page === 1
+        ? `https://govdoc.lk/category/term-test-papers/${slug}`
+        : `https://govdoc.lk/category/term-test-papers/${slug}/page/${page}`;
 
-    const link = $(el).attr("href");
-    const title = $(el).find("h5.cate-title").text().trim();
-    if (link && title) posts.push({ title, link });
-  });
+    try {
+      const res = await axios.get(url, { headers });
+      const $ = cheerio.load(res.data);
 
-  return posts.slice(0, 20);
+      let foundAny = false;
+      $("a.custom-card").each((_, el) => {
+        if ($(el).closest(".info-body").length > 0) return;
+        const link = $(el).attr("href");
+        const title = $(el).find("h5.cate-title").text().trim();
+        if (link && title) {
+          posts.push({ title, link });
+          foundAny = true;
+        }
+      });
+
+      if (!foundAny) break;
+    } catch (err) {
+      console.warn(`Failed to fetch page ${page}:`, err.message);
+      break;
+    }
+  }
+
+  return posts.slice(0, 50);
 }
 
-// 🧾 Step 1: User input command
+// 🧾 Command: .govdoc [grade] [subject]
 cmd(
   {
     pattern: "govdoc",
@@ -65,35 +82,36 @@ cmd(
     await m.react("📚");
 
     const input = q.trim().toLowerCase().split(/\s+/);
-    let grade = "";
-    let subject = "";
+    let grade = "", subject = "";
 
-    if (input.length === 1 && /^\d{1,2}$/.test(input[0])) {
-      grade = input[0];
-    } else if (input[0] === "grade" && /^\d{1,2}$/.test(input[1])) {
+    if (input[0] === "grade" && /^\d+$/.test(input[1])) {
       grade = input[1];
-      subject = input.slice(2).join("-");
-    } else if (/^\d{1,2}$/.test(input[0])) {
+      subject = input.slice(2).join("-").trim();
+    } else if (/^\d+$/.test(input[0])) {
       grade = input[0];
-      subject = input.slice(1).join("-");
-    } else {
-      return reply("❌ Invalid format. Try `.govdoc 10 ict` or `.govdoc grade 11 history`");
+      subject = input.slice(1).join("-").trim();
     }
 
-    // 🧠 Handle subject short forms
-    if (subject && subjectAliases[subject]) {
-      subject = subjectAliases[subject];
-    }
-    const gradeSlug = subject
-      ? `grade-${grade}/${subject}`
-      : `grade-${grade}`;
+    if (!grade) return reply("❌ Invalid format. Use `.govdoc 10 ict`");
 
+    if (subjectAliases[subject]) subject = subjectAliases[subject];
+
+    const gradeSlug = subject ? `grade-${grade}/${subject}` : `grade-${grade}`;
     const posts = await fetchGovdocPosts(gradeSlug);
+
     if (!posts.length) return reply(`❌ No papers found for *${gradeSlug}*`);
 
     let msg = `📚 *GovDoc ${gradeSlug.toUpperCase()} Term Test Papers*\n────────────────────\n_Reply with number to select paper_\n\n`;
     posts.forEach((post, i) => {
-      msg += `*${i + 1}.* ${post.title}\n`;
+      let title = post.title;
+
+      // 🔆 Highlight subject if found in title
+      if (subject && title.toLowerCase().includes(subject.replace(/-/g, " "))) {
+        const reg = new RegExp(`(${subject.replace(/-/g, " ")})`, "ig");
+        title = title.replace(reg, "*$1*");
+      }
+
+      msg += `*${i + 1}.* ${title}\n`;
     });
 
     await robin.sendMessage(from, { text: msg }, { quoted: mek });
@@ -106,7 +124,7 @@ cmd(
   }
 );
 
-// Step 2: User selects a paper
+// 🔢 Step 2: User selects post
 cmd(
   {
     filter: (text, { sender }) =>
@@ -117,7 +135,7 @@ cmd(
     const selected = parseInt(body.trim());
 
     if (selected < 1 || selected > pending.results.length) {
-      return reply("❌ Invalid selection. Please reply with a valid number.");
+      return reply("❌ Invalid selection.");
     }
 
     const selectedResult = pending.results[selected - 1];
@@ -140,7 +158,7 @@ cmd(
 
       if (!languages.length) {
         delete pendingGovDoc[sender];
-        return reply("⚠️ No language options found for this paper.");
+        return reply("⚠️ No language options found.");
       }
 
       let langMsg = `🌐 *Available Languages for:* _${selectedResult.title}_\n\n`;
@@ -159,13 +177,13 @@ cmd(
       reply(langMsg);
     } catch (e) {
       console.error(e);
-      reply("⚠️ Failed to fetch language options. Please try again.");
+      reply("⚠️ Failed to fetch language options.");
       delete pendingGovDoc[sender];
     }
   }
 );
 
-// Step 3: Download PDF
+// 📥 Step 3: Download PDF via Puppeteer
 cmd(
   {
     filter: (text, { sender }) =>
@@ -176,7 +194,7 @@ cmd(
     const selected = parseInt(body.trim());
 
     if (selected < 1 || selected > pending.languages.length) {
-      return reply("❌ Invalid selection. Please reply with a valid number.");
+      return reply("❌ Invalid selection.");
     }
 
     const lang = pending.languages[selected - 1];
@@ -212,7 +230,7 @@ cmd(
 
       await browser.close();
 
-      if (!fileName) throw new Error("Download did not start in time.");
+      if (!fileName) throw new Error("Download did not complete in time.");
 
       const filePath = path.join(downloadDir, fileName);
       const pdfBuffer = fs.readFileSync(filePath);
@@ -233,7 +251,7 @@ cmd(
       delete pendingGovDoc[sender];
     } catch (e) {
       console.error("❌ Puppeteer download failed:", e.message);
-      reply("⚠️ Failed to download PDF. It may have timed out or failed to start.");
+      reply("⚠️ Failed to download PDF.");
       delete pendingGovDoc[sender];
     }
   }
