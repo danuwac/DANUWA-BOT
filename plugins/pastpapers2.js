@@ -13,7 +13,7 @@ const headers = {
 
 const pendingGovDoc = {};
 
-// 🧠 Subject short forms to slugs
+// Subject short forms
 const subjectAliases = {
   commerce: "business-accounting-studies",
   ict: "information-and-communication-technology-ict",
@@ -33,28 +33,40 @@ const subjectAliases = {
   media: "communication-and-media-studies",
   dance: "dance",
   health: "health-physical-education",
-
 };
 
-// 📥 Step 1: Fetch post list by slug
-async function fetchGovdocPosts(slug) {
-  const url = `https://govdoc.lk/category/term-test-papers/${slug}`;
-  const res = await axios.get(url, { headers });
-  const $ = cheerio.load(res.data);
+// 🔁 Fetch up to 100 posts from all pages of a grade
+async function fetchGovdocPosts(grade, maxPages = 5) {
   const posts = [];
 
-  $("a.custom-card").each((_, el) => {
-    if ($(el).closest(".info-body").length > 0) return;
+  for (let page = 1; page <= maxPages; page++) {
+    const url = `https://govdoc.lk/category/term-test-papers/grade-${grade}/page/${page}`;
+    try {
+      const res = await axios.get(url, { headers });
+      const $ = cheerio.load(res.data);
 
-    const link = $(el).attr("href");
-    const title = $(el).find("h5.cate-title").text().trim();
-    if (link && title) posts.push({ title, link });
-  });
+      let found = 0;
+      $("a.custom-card").each((_, el) => {
+        const link = $(el).attr("href");
+        const title = $(el).find("h5.cate-title").text().trim();
 
-  return posts.slice(0, 20);
+        if (link && title && !posts.find(p => p.link === link)) {
+          posts.push({ title, link });
+          found++;
+        }
+      });
+
+      if (found === 0) break;
+    } catch (err) {
+      console.error(`⚠️ Error on page ${page}:`, err.message);
+      break;
+    }
+  }
+
+  return posts;
 }
 
-// 🧾 Step 1: User input command
+// 📥 Command: .govdoc grade + subject
 cmd(
   {
     pattern: "govdoc",
@@ -84,27 +96,31 @@ cmd(
       return reply("❌ Invalid format. Try `.govdoc 10 ict` or `.govdoc grade 11 history`");
     }
 
-    // 🧠 Handle subject short forms
     if (subject && subjectAliases[subject]) {
       subject = subjectAliases[subject];
     }
-    const gradeSlug = subject
-      ? `grade-${grade}/${subject}`
-      : `grade-${grade}`;
-    let posts = await fetchGovdocPosts(`grade-${grade}`);
+
+    let posts = await fetchGovdocPosts(grade);
 
     if (subject) {
-
       posts = posts.filter(p =>
         p.title.toLowerCase().includes(subject.replace(/-/g, " "))
-                          );
+      );
     }
 
-    if (!posts.length) return reply(`❌ No papers found for *${gradeSlug}*`);
+    if (!posts.length) return reply(`❌ No papers found for *grade-${grade}${subject ? "/" + subject : ""}*`);
 
-    let msg = `📚 *GovDoc ${gradeSlug.toUpperCase()} Term Test Papers*\n────────────────────\n_Reply with number to select paper_\n\n`;
+    let msg = `📚 *GovDoc Grade ${grade.toUpperCase()}${subject ? " - " + subject.replace(/-/g, " ").toUpperCase() : ""} Papers*\n────────────────────\n_Reply with number to select paper_\n\n`;
     posts.forEach((post, i) => {
-      msg += `*${i + 1}.* ${post.title}\n`;
+      let title = post.title;
+
+      // 🌟 Highlight subject in result
+      if (subject) {
+        const regex = new RegExp(`(${subject.replace(/-/g, " ")})`, "gi");
+        title = title.replace(regex, "*$1*");
+      }
+
+      msg += `*${i + 1}.* ${title}\n`;
     });
 
     await robin.sendMessage(from, { text: msg }, { quoted: mek });
@@ -117,7 +133,7 @@ cmd(
   }
 );
 
-// Step 2: User selects a paper
+// 📄 Step 2: User selects paper
 cmd(
   {
     filter: (text, { sender }) =>
@@ -176,7 +192,7 @@ cmd(
   }
 );
 
-// Step 3: Download PDF
+// 📥 Step 3: Puppeteer PDF downloader
 cmd(
   {
     filter: (text, { sender }) =>
