@@ -11,7 +11,6 @@ const headers = {
   "Accept-Language": "en-US,en;q=0.9",
 };
 
-// Short forms to full slugs
 const subjectAliases = {
   bas: "business-accounting-studies",
   ict: "information-and-communication-technology",
@@ -28,75 +27,94 @@ const subjectAliases = {
   dmt: "design-mechanical-technology",
   dct: "design-construction-technology",
   civ: "civic-education",
-  media: "communication-and-media-studies"
+  media: "communication-and-media-studies",
+  dance: "dance",
 };
 
 const pendingPastPaper = {};
 
-// 📥 Step 1: User types `.pastpapers 2023 bas`
+async function fetchLanguageOptions(url) {
+  const res = await axios.get(url, { headers });
+  const $ = cheerio.load(res.data);
+
+  const title = $("h1.entry-title").text().trim();
+  const languages = [];
+
+  $("a[href*='/view?id=']").each((_, el) => {
+    const lang = $(el).find("button").text().trim();
+    const href = $(el).attr("href");
+    if (lang && href) {
+      languages.push({
+        lang,
+        link: href.startsWith("http") ? href : `https://govdoc.lk${href}`,
+      });
+    }
+  });
+
+  return { title, languages };
+}
+
+// Step 1: .pastpapers 2024 ict
 cmd(
   {
     pattern: "pastol",
-    desc: "Download O/L past papers from govdoc.lk",
+    desc: "Download O/L past papers by year and subject",
     category: "education",
     react: "📄",
     filename: __filename,
   },
   async (robin, mek, m, { from, q, sender, reply }) => {
-    if (!q) return reply("❌ Usage: `.pastpapers <year> <subject>`\nExample: `.pastpapers 2023 bas`");
+    if (!q) return reply("❌ Usage: `.pastpapers <year> <subject>`");
 
     const parts = q.trim().toLowerCase().split(/\s+/);
     if (parts.length < 2) return reply("❌ You must provide both year and subject.");
 
     const year = parts[0];
-    const subjectKey = parts.slice(1).join("-").replace(/\s+/g, "-");
-    const subjectSlug = subjectAliases[subjectKey] || subjectKey;
-    const postUrl = `https://govdoc.lk/gce-ordinary-level-exam-${year}-${subjectSlug}-past-papers`;
+    const rawSubject = parts.slice(1).join("-").replace(/\s+/g, "-");
+    const subjectSlug = subjectAliases[rawSubject] || rawSubject;
 
-    try {
-      const { data } = await axios.get(postUrl, { headers });
-      const $ = cheerio.load(data);
+    const urlsToTry = [
+      `https://govdoc.lk/gce-ordinary-level-exam-${year}-${subjectSlug}-past-papers`,
+      `https://govdoc.lk/gce-ordinary-level-exam-${year}-${parseInt(year) + 1}-${subjectSlug}-past-papers`,
+    ];
 
-      const title = $("h1.entry-title").text().trim();
-      const languages = [];
+    let pageData;
+    let finalUrl;
 
-      $("a[href*='/view?id=']").each((_, el) => {
-        const lang = $(el).find("button").text().trim();
-        const href = $(el).attr("href");
-        if (lang && href) {
-          languages.push({
-            lang,
-            link: href.startsWith("http") ? href : `https://govdoc.lk${href}`,
-          });
+    for (const url of urlsToTry) {
+      try {
+        pageData = await fetchLanguageOptions(url);
+        if (pageData.languages.length) {
+          finalUrl = url;
+          break;
         }
-      });
-
-      if (!languages.length) {
-        return reply("⚠️ No language options found for that paper.");
+      } catch (e) {
+        // continue to try fallback
       }
-
-      let msg = `📄 *${title}*\n\n🌐 *Available Languages:*\n`;
-      languages.forEach((l, i) => {
-        msg += `*${i + 1}.* ${l.lang}\n`;
-      });
-      msg += `\n_Reply with a number to download that version._`;
-
-      pendingPastPaper[sender] = {
-        step: "download",
-        title,
-        languages,
-        quoted: mek,
-      };
-
-      await robin.sendMessage(from, { text: msg }, { quoted: mek });
-    } catch (e) {
-      console.error("❌ Failed to fetch page:", e.message);
-      return reply("❌ Invalid year or subject, or paper not found.");
     }
+
+    if (!pageData || !pageData.languages.length) {
+      return reply("❌ Past paper not found. Check the year or subject name.");
+    }
+
+    const msgLines = [`📄 *${pageData.title}*`, `\n🌐 *Available Languages:*`];
+    pageData.languages.forEach((l, i) => {
+      msgLines.push(`*${i + 1}.* ${l.lang}`);
+    });
+    msgLines.push(`\n_Reply with a number to download that version._`);
+
+    pendingPastPaper[sender] = {
+      step: "download",
+      title: pageData.title,
+      languages: pageData.languages,
+      quoted: mek,
+    };
+
+    await robin.sendMessage(from, { text: msgLines.join("\n") }, { quoted: mek });
   }
 );
 
-// 📥 Step 2: User replies with a number to choose language
+// Step 2: user replies with number
 cmd(
   {
     filter: (text, { sender }) =>
@@ -133,6 +151,7 @@ cmd(
       await page.waitForSelector('a.btn.w-100[href*="/download/"]', { timeout: 15000 });
       await page.click('a.btn.w-100[href*="/download/"]');
 
+      // Wait for download
       let fileName;
       for (let i = 0; i < 20; i++) {
         const files = fs.readdirSync(downloadDir).filter(f => f.endsWith(".pdf"));
