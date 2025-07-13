@@ -43,8 +43,8 @@ async function extractGoogleDriveLinks(postUrl) {
 
 async function handleCommand(conn, mek, m, from, commandType, query) {
   const base = commandType === 'ol'
-    ? 'https://e-kalvi.com/category/gce-o-l/'
-    : 'https://e-kalvi.com/category/gce-a-l/';
+    ? 'https://e-kalvi.com/category/sinhala-medium/o-l/'
+    : 'https://e-kalvi.com/category/sinhala-medium/a-l-sinhala-medium/';
 
   const posts = await getEkalviPosts(base, query);
   if (!posts.length) return m.reply('❌ No posts found for that category/language.');
