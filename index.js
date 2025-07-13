@@ -233,18 +233,7 @@ async function connectToWA() {
       ? mek.message.conversation
       : mek.message[type]?.text || mek.message[type]?.caption || '';
 
-    if (body === ".testbtn") {
-      await conn.sendMessage(from, {
-        text: "📚 *DANUWA Menu*",
-        footer: "Select a category below 👇",
-        buttons: [
-          { buttonId: ".govdocmenu_term", buttonText: { displayText: "📝 Term Test Papers (Grade 6–13)" }, type: 1 },
-          { buttonId: ".govdocmenu_ol", buttonText: { displayText: "📘 GCE O/L Past Papers" }, type: 1 },
-          { buttonId: ".govdocmenu_al", buttonText: { displayText: "📗 GCE A/L Past Papers" }, type: 1 },
-        ],
-        headerType: 1
-      }, { quoted: mek });
-    }
+
     const isCmd = body.startsWith(prefix);
     const commandName = isCmd ? body.slice(prefix.length).trim().split(" ")[0].toLowerCase() : '';
     const args = body.trim().split(/ +/).slice(1);
