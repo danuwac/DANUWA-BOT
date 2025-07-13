@@ -4,12 +4,24 @@ const cheerio = require("cheerio");
 const fs = require("fs");
 const path = require("path");
 
-// Base URLs for scraping
-const SCRAPE_SOURCES = {
-  "PastPapersWiki": "https://pastpapers.wiki/",
-  "GovDocLK": "https://govdoc.lk/education/past-papers",
-  "E-Thaksalawa": "https://www.e-thaksalawa.moe.gov.lk/"
-};
+// Base URLs for scraping with multiple sources
+const SCRAPE_SOURCES = [
+  {
+    name: "PastPapersWiki",
+    url: "https://pastpapers.wiki/",
+    searchPath: (examType) => `${examType}-past-papers`
+  },
+  {
+    name: "E-Thaksalawa",
+    url: "https://www.e-thaksalawa.moe.gov.lk/",
+    searchPath: (examType) => `past-papers/${examType}`
+  },
+  {
+    name: "GovDocLK",
+    url: "https://govdoc.lk/",
+    searchPath: (examType) => `education/past-papers/${examType}`
+  }
+];
 
 // Stream/subject categorization
 const STREAMS = {
@@ -35,6 +47,14 @@ const CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
 
 // Store user selections temporarily
 const userSelections = {};
+
+// Rotating user agents to avoid blocking
+const USER_AGENTS = [
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15"
+];
 
 cmd(
   {
@@ -74,8 +94,29 @@ cmd(
 
       await reply(`🔍 *Searching for ${examType.toUpperCase()} past papers...*`);
 
-      // Scrape papers
-      const papers = await scrapePastPapers(examType, stream);
+      // Try scraping from multiple sources
+      let papers = [];
+      let lastError = null;
+      
+      for (const source of SCRAPE_SOURCES) {
+        try {
+          const sourcePapers = await scrapePastPapers(source, examType, stream);
+          papers = papers.concat(sourcePapers);
+          if (papers.length > 0) break; // Stop if we got results from one source
+        } catch (e) {
+          console.error(`Scraping failed from ${source.name}:`, e.message);
+          lastError = e;
+          continue; // Try next source
+        }
+      }
+
+      if (papers.length === 0) {
+        // If scraping failed, use fallback method
+        papers = await getFallbackPapers(examType, stream);
+        if (papers.length === 0) {
+          throw lastError || new Error("No papers found and scraping failed");
+        }
+      }
 
       // Cache the results
       papersCache[cacheKey] = {
@@ -86,55 +127,87 @@ cmd(
       await sendPapersList(robin, from, mek, papers, examType, stream);
     } catch (e) {
       console.error(e);
-      reply("❌ An error occurred. Please try again later.");
+      reply("❌ Failed to fetch past papers. The website may be blocking our requests. Please try again later or use direct links from official sources.");
     }
   }
 );
 
-// Function to scrape past papers
-async function scrapePastPapers(examType, stream) {
+// Function to scrape past papers from a source
+async function scrapePastPapers(source, examType, stream) {
   try {
-    // This would be your actual scraping logic for each website
-    // Here's a mock implementation for demonstration
-    
     const papers = [];
+    const url = `${source.url}${source.searchPath(examType)}`;
     
-    // Example: Scrape from PastPapersWiki
-    const response = await axios.get(`${SCRAPE_SOURCES.PastPapersWiki}/${examType}-past-papers`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
+    // Random user agent and headers
+    const headers = {
+      'User-Agent': USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)],
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.5',
+      'Referer': source.url,
+      'DNT': '1'
+    };
+
+    // Add delay to avoid rate limiting
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    const response = await axios.get(url, {
+      headers,
+      timeout: 10000
     });
+    
+    if (response.status !== 200) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
     const $ = cheerio.load(response.data);
     
-    // Example scraping logic (adjust based on actual website structure)
-    $(".paper-item").each((i, el) => {
-      const title = $(el).find(".title").text().trim();
-      const yearMatch = title.match(/(\d{4})/);
-      const year = yearMatch ? yearMatch[1] : "Unknown";
+    // Example scraping logic - adjust based on actual website structure
+    $(".paper-item, .entry, .post, .resource").each((i, el) => {
+      const title = $(el).find(".title, h3, h2").text().trim() || "Untitled";
+      const yearMatch = title.match(/(\d{4})/) || [];
+      const year = yearMatch[1] || "Unknown";
       
-      const subject = $(el).find(".subject").text().trim();
+      const subject = $(el).find(".subject, .category, .meta").text().trim() || "General";
       const url = $(el).find("a").attr("href");
       
+      if (!url) return;
+      
       // Filter by stream if specified
-      if (!stream || STREAMS[examType][stream]?.some(s => subject.includes(s))) {
+      if (!stream || STREAMS[examType][stream]?.some(s => 
+        subject.toLowerCase().includes(s.toLowerCase()))
+      ) {
         papers.push({
           title,
           year,
           subject,
-          url: url.startsWith('http') ? url : `${SCRAPE_SOURCES.PastPapersWiki}${url}`,
-          source: "PastPapersWiki"
+          url: url.startsWith('http') ? url : `${source.url}${url}`,
+          source: source.name
         });
       }
     });
     
-    // You could add similar scraping for other sources here
-    
     return papers;
   } catch (e) {
-    console.error("Scraping error:", e);
-    throw new Error("Failed to fetch past papers from online sources");
+    console.error(`Error scraping from ${source.name}:`, e.message);
+    throw e;
   }
+}
+
+// Fallback method when scraping fails
+async function getFallbackPapers(examType, stream) {
+  // This could be replaced with direct links to known paper repositories
+  // or API calls if available
+  
+  console.log("Using fallback paper source");
+  return [
+    {
+      title: `${examType.toUpperCase()} Past Paper Sample`,
+      year: "2022",
+      subject: "Mathematics",
+      url: "https://www.example.com/sample.pdf",
+      source: "Fallback"
+    }
+  ];
 }
 
 // Function to send papers list to user
@@ -181,9 +254,8 @@ cmd(
       return text && (/\d{4}/.test(text) || Object.values(STREAMS).some(streams => 
         Object.values(streams).flat().some(subject => 
           text.trim().toLowerCase().includes(subject.toLowerCase())
-                                          )
-                                                                      )
-                     );
+        )
+      );
     },
     on: "pastpapers"
   },
