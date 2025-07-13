@@ -3,7 +3,7 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const https = require('https');
 
-// Configuration
+// Configuration with multiple sources
 const SCRAPE_SOURCES = [
   {
     name: "PastPapersWiki",
@@ -30,30 +30,57 @@ const SCRAPE_SOURCES = [
       year: ".meta",
       link: "a.download"
     }
+  },
+  {
+    name: "EduPub",
+    baseUrl: "https://www.edupub.gov.lk/",
+    searchPath: (exam, subject) => `Downloads/papers/${exam.toUpperCase()}/${subject || ''}`,
+    selectors: {
+      items: ".paper-item",
+      title: ".paper-title",
+      image: ".paper-thumbnail img",
+      description: ".paper-desc",
+      year: ".paper-year",
+      link: "a.download-link"
+    }
   }
 ];
 
-// Exam and subject mapping
-const EXAM_TYPES = {
+// Known paper repositories (direct links fallback)
+const PAPER_REPOSITORIES = {
   "ol": {
-    name: "Ordinary Level (O/L)",
-    subjects: {
-      "maths": "Mathematics",
-      "science": "Science",
-      "english": "English",
-      "sinhala": "Sinhala",
-      "history": "History"
-    }
+    "maths": [
+      {
+        title: "O/L Mathematics 2022",
+        year: "2022",
+        url: "https://www.edupub.gov.lk/Downloads/papers/OL/2022/Maths.pdf",
+        source: "EduPub"
+      },
+      {
+        title: "O/L Mathematics 2021",
+        year: "2021",
+        url: "https://www.edupub.gov.lk/Downloads/papers/OL/2021/Maths.pdf",
+        source: "EduPub"
+      }
+    ],
+    "science": [
+      {
+        title: "O/L Science 2022",
+        year: "2022",
+        url: "https://www.edupub.gov.lk/Downloads/papers/OL/2022/Science.pdf",
+        source: "EduPub"
+      }
+    ]
   },
   "al": {
-    name: "Advanced Level (A/L)",
-    subjects: {
-      "maths": "Combined Mathematics",
-      "physics": "Physics",
-      "chemistry": "Chemistry",
-      "bio": "Biology",
-      "ict": "ICT"
-    }
+    "maths": [
+      {
+        title: "A/L Combined Maths 2022",
+        year: "2022",
+        url: "https://www.edupub.gov.lk/Downloads/papers/AL/2022/CombinedMaths.pdf",
+        source: "EduPub"
+      }
+    ]
   }
 };
 
@@ -72,34 +99,41 @@ function formatBytes(bytes, decimals = 2) {
 async function scrapePapers(source, exam, subject) {
   try {
     const url = `${source.baseUrl}${source.searchPath(exam, subject)}`;
+    console.log(`Attempting to scrape from: ${url}`);
+    
     const response = await axios.get(url, {
       httpsAgent: new https.Agent({ rejectUnauthorized: false }),
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        'Accept-Language': 'en-US,en;q=0.9'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://www.google.com/'
       },
-      timeout: 15000
+      timeout: 20000
     });
 
     const $ = cheerio.load(response.data);
     const papers = [];
 
     $(source.selectors.items).each((i, el) => {
-      const title = $(el).find(source.selectors.title).text().trim();
-      const image = $(el).find(source.selectors.image).attr('src');
-      const description = $(el).find(source.selectors.description).text().trim();
-      const year = $(el).find(source.selectors.year).text().trim().match(/\d{4}/)?.[0] || "N/A";
-      const link = $(el).find(source.selectors.link).attr('href');
+      try {
+        const title = $(el).find(source.selectors.title).text().trim();
+        const image = $(el).find(source.selectors.image).attr('src');
+        const description = $(el).find(source.selectors.description).text().trim();
+        const year = $(el).find(source.selectors.year).text().trim().match(/\d{4}/)?.[0] || "N/A";
+        const link = $(el).find(source.selectors.link).attr('href');
 
-      if (title && link) {
-        papers.push({
-          title,
-          image: image?.startsWith('http') ? image : `${source.baseUrl}${image}`,
-          description,
-          year,
-          link: link?.startsWith('http') ? link : `${source.baseUrl}${link}`,
-          source: source.name
-        });
+        if (title && link) {
+          papers.push({
+            title,
+            image: image?.startsWith('http') ? image : `${source.baseUrl}${image}`,
+            description,
+            year,
+            link: link?.startsWith('http') ? link : `${source.baseUrl}${link}`,
+            source: source.name
+          });
+        }
+      } catch (e) {
+        console.error(`Error parsing paper item: ${e.message}`);
       }
     });
 
@@ -110,27 +144,71 @@ async function scrapePapers(source, exam, subject) {
   }
 }
 
+async function getFallbackPapers(exam, subject) {
+  try {
+    // First try known repositories
+    if (subject && PAPER_REPOSITORIES[exam]?.[subject]) {
+      return PAPER_REPOSITORIES[exam][subject];
+    } else if (!subject) {
+      // Get all papers for exam type if no subject specified
+      let allPapers = [];
+      Object.values(PAPER_REPOSITORIES[exam] || {}).forEach(subjectPapers => {
+        allPapers = allPapers.concat(subjectPapers);
+      });
+      return allPapers;
+    }
+
+    // If no papers found in repositories, try alternative methods
+    return await tryAlternativeScraping(exam, subject);
+  } catch (error) {
+    console.error("Error in fallback papers:", error);
+    return [];
+  }
+}
+
+async function tryAlternativeScraping(exam, subject) {
+  // Alternative scraping methods can be added here
+  console.log(`Trying alternative scraping for ${exam} ${subject}`);
+  return [];
+}
+
 async function getDownloadLinks(paperUrl) {
   try {
+    console.log(`Fetching download links from: ${paperUrl}`);
     const response = await axios.get(paperUrl, {
       httpsAgent: new https.Agent({ rejectUnauthorized: false }),
-      timeout: 15000
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      },
+      timeout: 20000
     });
+    
     const $ = cheerio.load(response.data);
     const links = [];
 
-    // Extract download links - adjust selectors based on actual site structure
-    $('a.download-link, .download-btn').each((i, el) => {
-      const url = $(el).attr('href');
-      const text = $(el).text().trim();
-      if (url && url.match(/\.pdf$/i)) {
-        links.push({
-          url,
-          label: text || `Download Link ${i+1}`,
-          type: 'pdf'
-        });
-      }
-    });
+    // Try multiple selector patterns
+    const selectorsToTry = [
+      'a[href$=".pdf"]',
+      'a.download-link',
+      '.download-btn',
+      'a[href*="download"]',
+      'a[href*="paper"]'
+    ];
+
+    for (const selector of selectorsToTry) {
+      $(selector).each((i, el) => {
+        const url = $(el).attr('href');
+        const text = $(el).text().trim();
+        if (url && url.match(/\.pdf$/i)) {
+          links.push({
+            url: url.startsWith('http') ? url : new URL(url, paperUrl).href,
+            label: text || `Download Link ${links.length + 1}`,
+            type: 'pdf'
+          });
+        }
+      });
+      if (links.length > 0) break;
+    }
 
     return links.length > 0 ? links : [{ url: paperUrl, label: "Direct Link", type: "unknown" }];
   } catch (error) {
@@ -171,18 +249,22 @@ cmd({
 
     await m.react('🔍');
 
-    // Check all sources for papers
+    // Try scraping first
     let allPapers = [];
     for (const source of SCRAPE_SOURCES) {
       const papers = await scrapePapers(source, examType, subject);
       if (papers.length > 0) {
-        allPapers = [...allPapers, ...papers];
-        break; // Use first successful source
+        allPapers = papers;
+        break;
       }
     }
 
+    // If scraping failed, use fallback
     if (allPapers.length === 0) {
-      return reply('❌ No past papers found. The websites may be down or blocking requests.');
+      allPapers = await getFallbackPapers(examType, subject);
+      if (allPapers.length === 0) {
+        return reply(`❌ No past papers found. You can try:\n\n1. Official sources:\n- https://www.edupub.gov.lk/\n- https://www.e-thaksalawa.moe.gov.lk/\n\n2. Search Google: "site:gov.lk ${examType.toUpperCase()} ${subject || ''} past papers"`);
+      }
     }
 
     // Store papers in user session
@@ -202,6 +284,7 @@ ${subject ? `📖 Subject: *${EXAM_TYPES[examType].subjects[subject]}*\n` : ''}
 
     allPapers.forEach((paper, index) => {
       menuMessage += `\n${index + 1}. *${paper.title}* (${paper.year})`;
+      if (paper.source) menuMessage += ` [${paper.source}]`;
     });
 
     menuMessage += `\n\n💬 *Reply with the number of the paper you want*`;
@@ -218,7 +301,7 @@ ${subject ? `📖 Subject: *${EXAM_TYPES[examType].subjects[subject]}*\n` : ''}
           msg.message.extendedTextMessage.contextInfo?.stanzaId !== sentMsg.key.id) return;
 
       const selectedNum = parseInt(msg.message.extendedTextMessage.text.trim());
-      if (isNaN(selectedNum)) {
+      if (isNaN(selectedNum) {
         await conn.sendMessage(from, { 
           text: '❌ Please reply with a number from the list.',
           quoted: msg
@@ -241,7 +324,7 @@ ${subject ? `📖 Subject: *${EXAM_TYPES[examType].subjects[subject]}*\n` : ''}
       const downloadLinks = await getDownloadLinks(selectedPaper.link);
       if (!downloadLinks || downloadLinks.length === 0) {
         await conn.sendMessage(from, { 
-          text: '❌ Could not retrieve download links for this paper.',
+          text: `❌ Could not retrieve download links. You can try accessing directly:\n${selectedPaper.link}`,
           quoted: msg
         });
         return;
@@ -317,7 +400,7 @@ ${subject ? `📖 Subject: *${EXAM_TYPES[examType].subjects[subject]}*\n` : ''}
         } catch (error) {
           console.error("Download error:", error);
           await conn.sendMessage(from, {
-            text: `❌ Failed to download the paper. You can try the direct link:\n${selectedLink.url}`,
+            text: `❌ Failed to download the paper. You can try:\n1. Direct link: ${selectedLink.url}\n2. Official source: ${selectedPaper.link}`,
             quoted: dlMsg
           });
         }
