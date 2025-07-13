@@ -27,9 +27,18 @@ async (conn, mek, m, {
 ╰────────────────────────────╯
 ⚡ *Powered By:* ©DANUWA-MD ❤️`;
 
-        await conn.sendMessage(from, {
+        const buttons = [
+            { buttonId: ".termtest", buttonText: { displayText: "📝 Term Test Papers" }, type: 1 },
+            { buttonId: ".pastpapers ol", buttonText: { displayText: "📘 O/L Past Papers" }, type: 1 },
+            { buttonId: ".pastpapers al", buttonText: { displayText: "📗 A/L Past Papers" }, type: 1 }
+        ];
+
+        const buttonMessage = {
             image: { url: bannerImg },
             caption: menuCaption,
+            footer: "Join our newsletter below 👇",
+            buttons: buttons,
+            headerType: 4,
             contextInfo: {
                 forwardingScore: 999,
                 isForwarded: true,
@@ -39,7 +48,9 @@ async (conn, mek, m, {
                     serverMessageId: -1
                 }
             }
-        }, { quoted: mek });
+        };
+
+        await conn.sendMessage(from, buttonMessage, { quoted: mek });
 
     } catch (err) {
         console.error("❌ Error sending govdocmenu:", err);
