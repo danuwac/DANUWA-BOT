@@ -1,31 +1,40 @@
 const { cmd } = require("../command");
+const { getBuffer } = require("../lib/functions"); // Make sure this is correctly implemented
 
 cmd(
   {
     pattern: "govdocmenu",
-    desc: "GovDoc.lk main menu",
+    desc: "Show GovDoc.lk main menu",
     react: "📚",
     category: "education",
     filename: __filename,
   },
-  async (robin, mek, m, { from }) => {
-    const listMessage = {
-      text: "📘 *GovDoc.lk Exam Resources*",
-      title: "Choose an Option",
-      buttonText: "View Options",
-      footer: "Powered by Danuwa MD",
-      sections: [
-        {
-          title: "Exam Papers",
-          rows: [
-            { title: "📚 Term Test (Grade 6–13)", rowId: ".termtest" },
-            { title: "📄 O/L Past Papers", rowId: ".olpast" },
-            { title: "📄 A/L Past Papers", rowId: ".alpast" }
-          ]
-        }
-      ]
-    };
+  async (conn, mek, m, { from }) => {
+    const menuText = `
+╔══ ❖  *📚 DANUWA-MD MENU* ❖ ══╗
 
-    await robin.sendMessage(from, listMessage, { quoted: mek });
+📝  Term Test Papers (Grade 6–13)
+📘  GCE O/L Past Papers
+📗  GCE A/L Past Papers
+
+╚═══════════════════════╝
+
+⚡ *Powered By:* ©DANUWA-MD ❤️
+`;
+
+    await conn.sendMessage(from, {
+      text: menuText,
+      contextInfo: {
+        externalAdReply: {
+          title: "DANUWA-MD WhatsApp Bot",
+          body: "Open powerful .govdoc tools now",
+          thumbnail: await getBuffer("https://i.imgur.com/B3KTpLW.jpeg"), // use your logo or banner
+          sourceUrl: "https://github.com/DANUWA-MD/DANUWA-BOT", // change to your repo or site
+          mediaType: 1,
+          renderLargerThumbnail: true,
+          showAdAttribution: true,
+        },
+      },
+    }, { quoted: mek });
   }
 );
