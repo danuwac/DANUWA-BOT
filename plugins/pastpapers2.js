@@ -2,6 +2,9 @@ const { cmd } = require("../command");
 const axios = require("axios");
 const cheerio = require("cheerio");
 const puppeteer = require("puppeteer");
+const fs = require("fs");
+const path = require("path");
+const os = require("os");
 
 const headers = {
   "User-Agent": "Mozilla/5.0",
@@ -10,7 +13,7 @@ const headers = {
 
 const pendingGovDoc = {};
 
-// Step 1: Fetch posts
+// Step 1: Fetch paper list
 async function fetchGovdocPosts(gradeSlug) {
   const url = `https://govdoc.lk/category/term-test-papers/${gradeSlug}`;
   const res = await axios.get(url, { headers });
@@ -26,7 +29,7 @@ async function fetchGovdocPosts(gradeSlug) {
   return posts.slice(0, 20);
 }
 
-// .govdoc grade 11
+// Command: .govdoc grade 11
 cmd(
   {
     pattern: "govdoc",
@@ -59,7 +62,7 @@ cmd(
   }
 );
 
-// Step 2: User selects a paper
+// Step 2: Select paper
 cmd(
   {
     filter: (text, { sender }) =>
@@ -118,7 +121,7 @@ cmd(
   }
 );
 
-// Step 3: Download using Puppeteer
+// Step 3: Puppeteer file download
 cmd(
   {
     filter: (text, { sender }) =>
@@ -133,54 +136,64 @@ cmd(
     }
 
     const lang = pending.languages[selected - 1];
+    const downloadDir = path.join(os.tmpdir(), `govdoc-${Date.now()}`);
 
     try {
+      fs.mkdirSync(downloadDir);
+
       const browser = await puppeteer.launch({
         headless: "new",
         args: ["--no-sandbox", "--disable-setuid-sandbox"],
       });
 
       const page = await browser.newPage();
-      await page.goto(lang.link, { waitUntil: "networkidle2", timeout: 30000 });
-
-      // Wait for the download button and extract the href
-      await page.waitForSelector('a.btn.w-100[href*="/download/"]', { timeout: 15000 });
-      const downloadUrl = await page.$eval('a.btn.w-100[href*="/download/"]', a =>
-        a.href.startsWith("http") ? a.href : `https://govdoc.lk${a.getAttribute("href")}`
-      );
-
-      // Download the file content from extracted downloadUrl
-      const pdfResponse = await axios.get(downloadUrl, {
-        responseType: "arraybuffer",
-        headers: {
-          ...headers,
-          Referer: lang.link,
-        },
+      await page._client().send("Page.setDownloadBehavior", {
+        behavior: "allow",
+        downloadPath: downloadDir,
       });
 
-      const contentType = pdfResponse.headers["content-type"];
-      if (!contentType.includes("pdf")) {
-        throw new Error("Not a PDF file. Got: " + contentType);
+      await page.goto(lang.link, { waitUntil: "networkidle2", timeout: 30000 });
+      await page.waitForSelector('a.btn.w-100[href*="/download/"]', { timeout: 15000 });
+      await page.click('a.btn.w-100[href*="/download/"]');
+
+      // Wait for file to download (max 20s)
+      let fileName;
+      for (let i = 0; i < 20; i++) {
+        const files = fs.readdirSync(downloadDir).filter(f => f.endsWith(".pdf"));
+        if (files.length > 0) {
+          fileName = files[0];
+          break;
+        }
+        await new Promise(res => setTimeout(res, 1000));
       }
 
-      const pdfBuffer = Buffer.from(pdfResponse.data);
-      const fileName = `${pending.selected.title} - ${lang.lang}.pdf`;
+      await browser.close();
+
+      if (!fileName) {
+        throw new Error("Download did not start in time.");
+      }
+
+      const filePath = path.join(downloadDir, fileName);
+      const pdfBuffer = fs.readFileSync(filePath);
+
+      const niceName = `${pending.selected.title} - ${lang.lang}.pdf`;
 
       await robin.sendMessage(
         from,
         {
           document: pdfBuffer,
           mimetype: "application/pdf",
-          fileName,
+          fileName: niceName,
         },
         { quoted: mek }
       );
 
-      await browser.close();
+      fs.unlinkSync(filePath);
+      fs.rmdirSync(downloadDir);
       delete pendingGovDoc[sender];
     } catch (e) {
       console.error("❌ Puppeteer download failed:", e.message);
-      reply("⚠️ Failed to download PDF using browser automation. The file may not be available.");
+      reply("⚠️ Failed to download PDF. It may have timed out or failed to start.");
       delete pendingGovDoc[sender];
     }
   }
