@@ -8,7 +8,7 @@ cmd(
     category: "education",
     filename: __filename,
   },
-  async (conn, mek, m, { from }) => {
+  async (conn, m, { from }) => {
     const menuText = `
 ╔══ ❖  *📚 DANUWA-MD MENU* ❖ ══╗
 
@@ -21,9 +21,8 @@ cmd(
 ⚡ *Powered By:* ©DANUWA-MD ❤️
 `;
 
-    await conn.sendMessage(
-      from,
-      {
+    try {
+      await conn.sendMessage(from, {
         text: menuText,
         footer: "📘 Choose a category",
         buttons: [
@@ -31,9 +30,10 @@ cmd(
           { buttonId: ".olpast", buttonText: { displayText: "📄 O/L Papers" }, type: 1 },
           { buttonId: ".alpast", buttonText: { displayText: "📗 A/L Papers" }, type: 1 }
         ],
-        headerType: 1
-      },
-      { quoted: mek }
-    );
+        headerType: 1,
+      }, { quoted: m });
+    } catch (err) {
+      console.error("❌ Error sending button message:", err);
+    }
   }
 );
