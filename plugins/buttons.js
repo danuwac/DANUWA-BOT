@@ -12,20 +12,25 @@ cmd({
 async (conn, mek, m, { from, reply }) => {
     try {
         const buttons = [
-            { buttonId: 'btn1', buttonText: { displayText: 'Button 1' }, type: 1 },
-            { buttonId: 'btn2', buttonText: { displayText: 'Button 2' }, type: 1 }
+            { buttonId: 'id1', buttonText: { displayText: 'Button 1' }, type: 1 },
+            { buttonId: 'id2', buttonText: { displayText: 'Button 2' }, type: 1 },
+            { buttonId: 'id3', buttonText: { displayText: 'Button 3' }, type: 1 }
         ];
 
-        const buttonMsg = {
-            text: "Test buttons:",
-            footer: "Select an option",
+        const buttonMessage = {
+            text: "Please select an option:",
+            footer: "Button Test",
             buttons: buttons,
             headerType: 1
         };
 
-        await conn.sendMessage(from, { interactive: buttonMsg }, { quoted: mek });
+        // Correct way to send interactive buttons
+        await conn.sendMessage(from, {
+            interactive: buttonMessage
+        }, { quoted: mek });
+
     } catch (err) {
-        console.error("🔴 BUTTON CMD ERROR:", err);
-        reply("❌ Failed to send buttons. Check console.");
+        console.error("⚠️ Button command error:", err);
+        reply("❌ Failed to send buttons. Check logs.");
     }
 });
