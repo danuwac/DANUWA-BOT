@@ -33,7 +33,7 @@ const subjectAliases = {
 };
 
 // 🔁 Fetch all posts (multi-page support)
-async function fetchGovdocPosts(slug, maxPages = 5) {
+async function fetchGovdocPosts(slug, maxPages = 30) {
   const posts = [];
 
   for (let page = 1; page <= maxPages; page++) {
