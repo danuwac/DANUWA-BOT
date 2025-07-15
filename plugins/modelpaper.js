@@ -15,11 +15,11 @@ const pendingModel = {};
 
 const subjectAliases = {
   accounting: "accounting",
-  agri: "agriculture-science",
+  agri: "agricultural-science",
   agrotech: "agro-technology",
   bio: "biology",
   buddhism: "buddhism",
-  bst: "bio-system-technology",
+  bst: "bio-systems-technology",
   chemistry: "chemistry",
   civics: "civic-education",
   comp: "combined-mathematics",
@@ -33,7 +33,7 @@ const subjectAliases = {
   geo: "geography",
   greek: "greek-and-roman-civilization",
   hist: "history",
-  ict: "information-and-communication-technology",
+  ict: "information-communication-technology-ict",
   islam: "islam",
   logic: "logic",
   math: "mathematics",
