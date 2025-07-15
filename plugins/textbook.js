@@ -13,55 +13,83 @@ const headers = {
 
 const pendingTextbook = {};
 
-// 📚 Step 1: Show list of textbooks
-cmd(
-  {
-    pattern: "textbook",
-    react: "📘",
-    desc: "Download Grade 11 Textbooks",
-    category: "education",
-    filename: __filename,
-  },
-  async (robin, mek, m, { from, sender, reply }) => {
-    await m.react("📘");
+// 🔁 Fetch all textbooks with pagination
+async function fetchTextbooks(grade) {
+  const textbooks = [];
+  let page = 1;
 
-    const url = "https://govdoc.lk/category/text-books/grade-11";
+  while (true) {
+    const url =
+      page === 1
+        ? `https://govdoc.lk/category/text-books/grade-${grade}`
+        : `https://govdoc.lk/category/text-books/grade-${grade}?page=${page}`;
 
     try {
       const res = await axios.get(url, { headers });
       const $ = cheerio.load(res.data);
 
-      const books = [];
-      $("a.custom-card").each((_, el) => {
-        const link = $(el).attr("href");
+      const cards = $("a.custom-card");
+      if (cards.length === 0) break;
+
+      let newItems = 0;
+
+      cards.each((_, el) => {
         const title = $(el).find("h5.cate-title").text().trim();
-        if (link && title) {
-          books.push({ title, link });
+        const link = $(el).attr("href");
+        if (title && link && !textbooks.find(t => t.link === link)) {
+          textbooks.push({ title, link });
+          newItems++;
         }
       });
 
-      if (!books.length) return reply("❌ No textbooks found!");
-
-      let msg = `📚 *Grade 11 Textbooks*\n────────────────────\n_Reply with a number to select a textbook_\n\n`;
-      books.forEach((book, i) => {
-        msg += `*${i + 1}.* ${book.title}\n`;
-      });
-
-      await robin.sendMessage(from, { text: msg }, { quoted: mek });
-
-      pendingTextbook[sender] = {
-        step: "select",
-        books,
-        quoted: mek,
-      };
+      if (newItems === 0) break;
+      page++;
     } catch (err) {
-      console.error("❌ Error fetching textbooks:", err.message);
-      reply("⚠️ Failed to fetch textbook list.");
+      console.error(`❌ Error loading page ${page}:`, err.message);
+      break;
     }
+  }
+
+  return textbooks;
+}
+
+// 📚 Step 1: .textbook [grade]
+cmd(
+  {
+    pattern: "textbook",
+    react: "📘",
+    desc: "Download textbooks by grade (e.g. .textbook 11)",
+    category: "education",
+    filename: __filename,
+  },
+  async (robin, mek, m, { from, q, sender, reply }) => {
+    const grade = q.trim();
+
+    if (!/^\d+$/.test(grade)) {
+      return reply("❌ Invalid input.\nUsage: `.textbook 10`");
+    }
+
+    await m.react("📘");
+    const books = await fetchTextbooks(grade);
+
+    if (!books.length) return reply(`❌ No textbooks found for Grade ${grade}`);
+
+    let msg = `📚 *Grade ${grade} Textbooks*\n────────────────────\n_Reply with number to select textbook_\n\n`;
+    books.forEach((book, i) => {
+      msg += `*${i + 1}.* ${book.title}\n`;
+    });
+
+    await robin.sendMessage(from, { text: msg }, { quoted: mek });
+
+    pendingTextbook[sender] = {
+      step: "select",
+      books,
+      quoted: mek,
+    };
   }
 );
 
-// 📥 Step 2: User selects a book
+// 🌐 Step 2: Select book → show language options
 cmd(
   {
     filter: (text, { sender }) =>
@@ -77,54 +105,54 @@ cmd(
       return reply("❌ Invalid selection.");
     }
 
-    const selectedBook = pending.books[selected - 1];
+    const chosen = pending.books[selected - 1];
 
     try {
-      const { data } = await axios.get(selectedBook.link, { headers });
+      const { data } = await axios.get(chosen.link, { headers });
       const $ = cheerio.load(data);
 
-      const languages = [];
+      const langs = [];
 
       $("a[href*='/view?id=']").each((_, el) => {
-        const lang = $(el).find("button").text().trim(); // <-- This matches govdoc
+        const lang = $(el).find("button").text().trim();
         const href = $(el).attr("href");
 
         if (lang && href) {
-          languages.push({
+          langs.push({
             lang,
             link: href.startsWith("http") ? href : `https://govdoc.lk${href}`,
           });
         }
       });
 
-      if (!languages.length) {
+      if (!langs.length) {
         delete pendingTextbook[sender];
-        return reply("⚠️ No language options found.");
+        return reply("⚠️ No language versions found.");
       }
 
-      let langMsg = `🌐 *Available Languages for:* _${selectedBook.title}_\n\n`;
-      languages.forEach((l, i) => {
-        langMsg += `*${i + 1}.* ${l.lang}\n`;
+      let msg = `🌐 *Available Languages for:* _${chosen.title}_\n\n`;
+      langs.forEach((l, i) => {
+        msg += `*${i + 1}.* ${l.lang}\n`;
       });
-      langMsg += `\n_Reply with a number (1-${languages.length}) to download._`;
+      msg += `\n_Reply with a number (1-${langs.length}) to download._`;
 
       pendingTextbook[sender] = {
         step: "download",
-        book: selectedBook,
-        langs: languages,
+        book: chosen,
+        langs,
         quoted: mek,
       };
 
-      reply(langMsg);
-    } catch (e) {
-      console.error("❌ Error scraping textbook page:", e.message);
+      reply(msg);
+    } catch (err) {
+      console.error("❌ Error scraping:", err.message);
       reply("⚠️ Failed to fetch language options.");
       delete pendingTextbook[sender];
     }
   }
 );
 
-// 📄 Step 3: Download selected language
+// 📥 Step 3: Download PDF via Puppeteer
 cmd(
   {
     filter: (text, { sender }) =>
@@ -177,14 +205,14 @@ cmd(
 
       const filePath = path.join(downloadDir, fileName);
       const buffer = fs.readFileSync(filePath);
-      const cleanName = `${pending.book.title} - ${lang.lang}.pdf`;
+      const fileNameNice = `${pending.book.title} - ${lang.lang}.pdf`;
 
       await robin.sendMessage(
         from,
         {
           document: buffer,
           mimetype: "application/pdf",
-          fileName: cleanName,
+          fileName: fileNameNice,
         },
         { quoted: mek }
       );
@@ -193,8 +221,8 @@ cmd(
       fs.rmdirSync(downloadDir);
       delete pendingTextbook[sender];
     } catch (err) {
-      console.error("❌ Puppeteer error:", err.message);
-      reply("⚠️ Failed to download the textbook.");
+      console.error("❌ Puppeteer download error:", err.message);
+      reply("⚠️ Failed to download PDF.");
       delete pendingTextbook[sender];
     }
   }
