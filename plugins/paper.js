@@ -2,7 +2,7 @@ const { cmd } = require('../command');
 const config = require('../config');
 
 cmd({
-    pattern: "educationalzone",
+    pattern: "edu",
     react: "📚",
     desc: "Educational Zone | Download term tests and past papers.",
     category: "education",
@@ -12,7 +12,7 @@ async (conn, mek, m, {
     from, reply
 }) => {
     try {
-        const bannerImg = 'https://github.com/dcd21865/DANUWA-BOT/blob/main/images/alive.png?raw=true';
+        const bannerImg = 'https://github.com/DANUWA-MD/DANUWA-BOT/blob/main/images/Alive.png?raw=true';
 
         const channelJid = '120363418166326365@newsletter'; 
         const channelName = '🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁';
