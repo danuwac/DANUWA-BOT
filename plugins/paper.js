@@ -47,24 +47,29 @@ const subjectAliases = {
 // Common functions
 
 async function fetchLanguageOptions(url) {
-  const res = await axios.get(url, { headers });
-  const $ = cheerio.load(res.data);
+  try {
+    const res = await axios.get(url, { headers, timeout: 10000 });
+    const $ = cheerio.load(res.data);
 
-  const title = $("h1.entry-title").text().trim();
-  const languages = [];
+    const title = $("h1.entry-title").text().trim();
+    const languages = [];
 
-  $("a[href*='/view?id=']").each((_, el) => {
-    const lang = $(el).find("button").text().trim();
-    const href = $(el).attr("href");
-    if (lang && href) {
-      languages.push({
-        lang,
-        link: href.startsWith("http") ? href : `https://govdoc.lk${href}`,
-      });
-    }
-  });
+    $("a[href*='/view?id=']").each((_, el) => {
+      const lang = $(el).find("button").text().trim();
+      const href = $(el).attr("href");
+      if (lang && href) {
+        languages.push({
+          lang,
+          link: href.startsWith("http") ? href : `https://govdoc.lk${href}`,
+        });
+      }
+    });
 
-  return { title, languages };
+    return { title, languages };
+  } catch (e) {
+    console.error("Error fetching language options:", e.message);
+    return { title: "", languages: [] };
+  }
 }
 
 async function downloadAndSendPDF(robin, link, title, lang, from, mek, sender, typePrefix) {
@@ -75,22 +80,64 @@ async function downloadAndSendPDF(robin, link, title, lang, from, mek, sender, t
 
     const browser = await puppeteer.launch({
       headless: "new",
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-accelerated-2d-canvas",
+        "--no-first-run",
+        "--no-zygote",
+        "--single-process",
+        "--disable-gpu"
+      ],
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath(),
     });
 
     const page = await browser.newPage();
+    await page.setUserAgent(headers["User-Agent"]);
+    await page.setExtraHTTPHeaders(headers);
+    
     await page._client().send("Page.setDownloadBehavior", {
       behavior: "allow",
       downloadPath: downloadDir,
     });
 
-    await page.goto(link, { waitUntil: "networkidle2", timeout: 30000 });
-    await page.waitForSelector('a.btn.w-100[href*="/download/"]', { timeout: 15000 });
-    await page.click('a.btn.w-100[href*="/download/"]');
+    console.log(`Navigating to: ${link}`);
+    await page.goto(link, { 
+      waitUntil: "networkidle2", 
+      timeout: 60000 
+    });
 
-    // Wait for download
+    // More robust selector waiting
+    try {
+      await page.waitForSelector('a.btn.w-100[href*="/download/"]', { 
+        timeout: 30000,
+        visible: true
+      });
+    } catch (e) {
+      // Try alternative selectors for O/L papers
+      await page.waitForSelector('a[href*="/download/"]', { timeout: 30000 });
+    }
+
+    const downloadUrl = await page.evaluate(() => {
+      const downloadBtn = document.querySelector('a.btn.w-100[href*="/download/"]') || 
+                         document.querySelector('a[href*="/download/"]');
+      return downloadBtn ? downloadBtn.href : null;
+    });
+
+    if (!downloadUrl) {
+      throw new Error("Download button/link not found");
+    }
+
+    console.log(`Found download URL: ${downloadUrl}`);
+    
+    // Directly navigate to download URL
+    await page.goto(downloadUrl, { waitUntil: "networkidle0", timeout: 60000 });
+
+    // Wait longer for O/L papers (40 seconds)
+    const maxWaitTime = typePrefix === "olpaper" ? 40 : 20;
     let fileName;
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < maxWaitTime; i++) {
       const files = fs.readdirSync(downloadDir).filter(f => f.endsWith(".pdf"));
       if (files.length > 0) {
         fileName = files[0];
@@ -101,11 +148,19 @@ async function downloadAndSendPDF(robin, link, title, lang, from, mek, sender, t
 
     await browser.close();
 
-    if (!fileName) throw new Error("Download did not complete.");
+    if (!fileName) {
+      throw new Error("Download did not complete in time.");
+    }
 
     const filePath = path.join(downloadDir, fileName);
+    const fileStat = fs.statSync(filePath);
+    
+    if (fileStat.size < 1024) {
+      throw new Error("Downloaded file is too small (possibly failed)");
+    }
+
     const buffer = fs.readFileSync(filePath);
-    const niceName = `${title} - ${lang}.pdf`;
+    const niceName = `${title.replace(/[^\w\s.-]/gi, '')} - ${lang}.pdf`;
 
     await robin.sendMessage(
       from,
@@ -122,6 +177,13 @@ async function downloadAndSendPDF(robin, link, title, lang, from, mek, sender, t
     delete pendingRequests[sender];
   } catch (e) {
     console.error("❌ Puppeteer download failed:", e.message);
+    try {
+      if (fs.existsSync(downloadDir)) {
+        fs.rmSync(downloadDir, { recursive: true, force: true });
+      }
+    } catch (cleanupErr) {
+      console.error("Cleanup failed:", cleanupErr.message);
+    }
     throw e;
   }
 }
@@ -238,7 +300,7 @@ cmd(
     filename: __filename,
   },
   async (robin, mek, m, { from, q, sender, reply }) => {
-    if (!q) return reply("❌ Usage: `.pastol <year> <subject>`");
+    if (!q) return reply("❌ Usage: `.pastol <year> <subject>`\nExample: `.pastol 2020 ict`");
 
     const parts = q.trim().toLowerCase().split(/\s+/);
     if (parts.length < 2) return reply("❌ You must provide both year and subject.");
@@ -247,35 +309,41 @@ cmd(
     const rawSubject = parts.slice(1).join("-").replace(/\s+/g, "-");
     const subjectSlug = subjectAliases[rawSubject] || rawSubject;
 
-    const urlsToTry = [
+    // More comprehensive URL patterns for O/L papers
+    const urlPatterns = [
       `https://govdoc.lk/gce-ordinary-level-exam-${year}-${subjectSlug}-past-papers`,
+      `https://govdoc.lk/gce-ordinary-level-exam-${year}-${subjectSlug}`,
+      `https://govdoc.lk/${year}-gce-ordinary-level-exam-${subjectSlug}-past-papers`,
+      `https://govdoc.lk/ordinary-level-exam-${year}-${subjectSlug}-past-papers`,
       `https://govdoc.lk/gce-ordinary-level-exam-${year}-${parseInt(year) + 1}-${subjectSlug}-past-papers`,
     ];
 
     let pageData;
     let finalUrl;
 
-    for (const url of urlsToTry) {
+    for (const url of urlPatterns) {
       try {
+        console.log(`Trying URL: ${url}`);
         pageData = await fetchLanguageOptions(url);
         if (pageData.languages.length) {
           finalUrl = url;
           break;
         }
       } catch (e) {
-        // continue to try fallback
+        console.log(`Failed with URL ${url}:`, e.message);
       }
     }
 
     if (!pageData || !pageData.languages.length) {
-      return reply("❌ Past paper not found. Check the year or subject name.");
+      return reply("❌ Past paper not found. Please check:\n- Year (2010-2023)\n- Subject name\nOr try an alternative subject name");
     }
 
-    const msgLines = [`📄 *${pageData.title}*`, `\n🌐 *Available Languages:*`];
-    pageData.languages.forEach((l, i) => {
-      msgLines.push(`*${i + 1}.* ${l.lang}`);
-    });
-    msgLines.push(`\n_Reply with a number to download that version._`);
+    const msgLines = [
+      `📄 *${pageData.title}*`,
+      `\n🌐 *Available Languages:*`,
+      ...pageData.languages.map((l, i) => `*${i + 1}.* ${l.lang}`),
+      `\n_Reply with number (1-${pageData.languages.length}) to download._`
+    ];
 
     pendingRequests[sender] = {
       type: "pastol",
