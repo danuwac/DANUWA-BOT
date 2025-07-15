@@ -67,7 +67,7 @@ async function fetchLanguageOptions(url) {
   return { title, languages };
 }
 
-async function downloadAndSendPDF(link, title, lang, from, mek, sender, typePrefix) {
+async function downloadAndSendPDF(robin, link, title, lang, from, mek, sender, typePrefix) {
   const downloadDir = path.join(os.tmpdir(), `${typePrefix}-${Date.now()}`);
 
   try {
@@ -403,6 +403,7 @@ cmd(
     try {
       await reply("⏳ Downloading PDF... Please wait.");
       await downloadAndSendPDF(
+        robin,
         lang.link,
         pending.title || pending.selected.title,
         lang.lang,
