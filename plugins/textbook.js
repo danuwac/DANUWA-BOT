@@ -77,54 +77,47 @@ cmd(
       return reply("❌ Invalid selection.");
     }
 
-    const chosen = pending.books[selected - 1];
-    const langButtons = [];
+    const selectedBook = pending.books[selected - 1];
 
     try {
-      const browser = await puppeteer.launch({
-        headless: "new",
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
-      });
+      const { data } = await axios.get(selectedBook.link, { headers });
+      const $ = cheerio.load(data);
 
-      const page = await browser.newPage();
-      await page.goto(chosen.link, { waitUntil: "domcontentloaded", timeout: 30000 });
+      const languages = [];
 
-      const links = await page.$$eval("a.btn", nodes =>
-        nodes.map(node => ({
-          lang: node.textContent.trim(),
-          link: node.href,
-        }))
-      );
+      $("a[href*='/view?id=']").each((_, el) => {
+        const lang = $(el).find("button").text().trim(); // <-- This matches govdoc
+        const href = $(el).attr("href");
 
-      await browser.close();
-
-      links.forEach(l => {
-        if (l.link && l.lang) {
-          langButtons.push(l);
+        if (lang && href) {
+          languages.push({
+            lang,
+            link: href.startsWith("http") ? href : `https://govdoc.lk${href}`,
+          });
         }
       });
 
-      if (!langButtons.length) {
+      if (!languages.length) {
         delete pendingTextbook[sender];
-        return reply("⚠️ Still no language versions found. This page might be broken.");
+        return reply("⚠️ No language options found.");
       }
 
-      let msg = `🌐 *Available Languages for:* _${chosen.title}_\n\n`;
-      langButtons.forEach((l, i) => {
-        msg += `*${i + 1}.* ${l.lang}\n`;
+      let langMsg = `🌐 *Available Languages for:* _${selectedBook.title}_\n\n`;
+      languages.forEach((l, i) => {
+        langMsg += `*${i + 1}.* ${l.lang}\n`;
       });
-      msg += `\n_Reply with a number to download._`;
+      langMsg += `\n_Reply with a number (1-${languages.length}) to download._`;
 
       pendingTextbook[sender] = {
         step: "download",
-        book: chosen,
-        langs: langButtons,
+        book: selectedBook,
+        langs: languages,
         quoted: mek,
       };
 
-      reply(msg);
-    } catch (err) {
-      console.error("❌ Puppeteer error in language version detection:", err.message);
+      reply(langMsg);
+    } catch (e) {
+      console.error("❌ Error scraping textbook page:", e.message);
       reply("⚠️ Failed to fetch language options.");
       delete pendingTextbook[sender];
     }
