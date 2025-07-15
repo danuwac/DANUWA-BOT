@@ -11,44 +11,77 @@ const headers = {
   "Accept-Language": "en-US,en;q=0.9",
 };
 
+const subjectAliases = {
+  sinhala: "sinhala",
+  mathematics: "mathematics",
+  science: "science",
+  history: "history",
+  english: "english",
+  ict: "information-and-communication-technology",
+  civic: "civic-education",
+  buddhism: "buddhism",
+  christianity: "christianity",
+  islam: "islam",
+  business: "business-and-accounting-studies",
+  geography: "geography",
+  home: "home-economics",
+  art: "art",
+  drama: "drama-&-theatre",
+  music: "western-music",
+  oriental: "oriental-music",
+  dance: "dance",
+  agriculture: "agriculture-&-food-technology",
+  designm: "design-and-mechanical-technology",
+  designc: "design-and-construction-technology",
+  elek: "design-electrical-&-electronic-technology",
+};
+
 const pendingModel = {};
 
-// 🔁 Fetch all posts (multi-page support)
-async function fetchModelPapers(slug) {
+// 🌐 Resolve URL based on type and optional subject
+function resolveModelURL(type, subject = "") {
+  const base = "https://govdoc.lk/category/model-papers/";
+  const typePath =
+    type === "o/l"
+      ? "gce-ordinary-level-exam"
+      : type === "a/l"
+      ? "gce-advance-level-exam"
+      : "";
+
+  return subject ? `${base}${typePath}/${subject}` : `${base}${typePath}`;
+}
+
+// 🔁 Fetch posts excluding related pages
+async function fetchModelPosts(type, subjectKey) {
   const posts = [];
   let page = 1;
+  const subjectSlug = subjectKey ? subjectAliases[subjectKey] : "";
+  const baseURL = resolveModelURL(type, subjectSlug);
 
   while (true) {
-    const url =
-      page === 1
-        ? `https://govdoc.lk/category/${slug}`
-        : `https://govdoc.lk/category/${slug}?page=${page}`;
+    const url = page === 1 ? baseURL : `${baseURL}?page=${page}`;
 
     try {
       const res = await axios.get(url, { headers });
       const $ = cheerio.load(res.data);
 
-      const cards = $("a.custom-card");
+      const cards = $("a.custom-card").filter((_, el) => {
+        return !$(el).attr("href").includes("/page/");
+      });
+
       if (cards.length === 0) break;
 
-      let newPosts = 0;
       cards.each((_, el) => {
         const link = $(el).attr("href");
         const title = $(el).find("h5.cate-title").text().trim();
-
-        // ❌ Skip related pages
-        if (link.includes("/page/")) return;
-
         if (link && title && !posts.find((p) => p.link === link)) {
           posts.push({ title, link });
-          newPosts++;
         }
       });
 
-      if (newPosts === 0) break;
       page++;
     } catch (err) {
-      console.error(`❌ Failed on page ${page}:`, err.message);
+      console.error("❌ Fetch failed:", err.message);
       break;
     }
   }
@@ -60,34 +93,36 @@ cmd(
   {
     pattern: "model",
     react: "📘",
-    desc: "Download model papers (O/L or A/L)",
+    desc: "Download model papers by O/L or A/L and optional subject",
     category: "education",
     filename: __filename,
   },
   async (robin, mek, m, { from, q, sender, reply }) => {
-    const level = q.trim().toLowerCase();
-    let slug = "";
-
-    if (level === "o/l" || level === "ol") {
-      slug = "model-papers/gce-ordinary-level-exam";
-    } else if (level === "a/l" || level === "al") {
-      slug = "model-papers/gce-advance-level-exam";
-    } else {
-      return reply("❌ Invalid input. Use `.model o/l` or `.model a/l`");
-    }
+    if (!q) return reply("❌ Example: `.model o/l` or `.model a/l accounting`");
 
     await m.react("📘");
-    const posts = await fetchModelPapers(slug);
+
+    const input = q.trim().toLowerCase().split(/\s+/);
+    const type = input[0];
+    const subjectInput = input.slice(1).join("-");
+
+    if (!["o/l", "a/l"].includes(type))
+      return reply("❌ Please specify `o/l` or `a/l`");
+
+    if (subjectInput && !subjectAliases[subjectInput]) {
+      return reply(`❌ Unknown subject \"${subjectInput}\". Use one of: ${Object.keys(subjectAliases).join(", ")}`);
+    }
+
+    const posts = await fetchModelPosts(type, subjectInput);
 
     if (!posts.length) return reply("❌ No model papers found.");
 
-    let msg = `📘 *GovDoc Model Papers (${level.toUpperCase()})*
-────────────────────
-_Reply with number to select paper_
+    let msg = `📘 *${type.toUpperCase()} Model Papers*`;
+    if (subjectInput) msg += ` — Subject: *${subjectInput.replace(/-/g, " ")}*`;
+    msg += `\n────────────────────\n_Reply with number to select paper_\n\n`;
 
-`;
-    posts.forEach((post, i) => {
-      msg += `*${i + 1}.* ${post.title}\n`;
+    posts.forEach((p, i) => {
+      msg += `*${i + 1}.* ${p.title}\n`;
     });
 
     await robin.sendMessage(from, { text: msg }, { quoted: mek });
@@ -100,7 +135,7 @@ _Reply with number to select paper_
   }
 );
 
-// Step 2: Select Paper
+// 🔢 Step 2: User selects post
 cmd(
   {
     filter: (text, { sender }) =>
@@ -134,7 +169,7 @@ cmd(
 
       if (!languages.length) {
         delete pendingModel[sender];
-        return reply("⚠️ No language versions found (but expected). Report this if issue continues.");
+        return reply("⚠️ No language options found.");
       }
 
       let langMsg = `🌐 *Available Languages for:* _${selectedResult.title}_\n\n`;
@@ -159,7 +194,7 @@ cmd(
   }
 );
 
-// Step 3: Download PDF via Puppeteer
+// 📥 Step 3: Download PDF via Puppeteer
 cmd(
   {
     filter: (text, { sender }) =>
