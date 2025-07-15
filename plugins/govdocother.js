@@ -13,14 +13,16 @@ const headers = {
 
 const pendingDownloads = {};
 
+// Utility: fetch all posts from category slug (supports pagination)
 async function fetchGovdocItems(categorySlug) {
   const items = [];
   let page = 1;
 
   while (true) {
-    const url = page === 1
-      ? `https://govdoc.lk/category/${categorySlug}`
-      : `https://govdoc.lk/category/${categorySlug}?page=${page}`;
+    const url =
+      page === 1
+        ? `https://govdoc.lk/category/${categorySlug}`
+        : `https://govdoc.lk/category/${categorySlug}?page=${page}`;
 
     try {
       const res = await axios.get(url, { headers });
@@ -34,12 +36,12 @@ async function fetchGovdocItems(categorySlug) {
       cards.each((_, el) => {
         const parent = $(el).closest(".card");
         const relatedContainer = parent.closest(".product-details-info");
-        if (relatedContainer.length) return;
+        if (relatedContainer.length) return; // skip related pages
 
         const link = $(el).attr("href");
         const title = $(el).find("h5.cate-title").text().trim();
 
-        if (link && title && !items.find(p => p.link === link)) {
+        if (link && title && !items.find((p) => p.link === link)) {
           items.push({ title, link });
           newItems++;
         }
@@ -52,11 +54,11 @@ async function fetchGovdocItems(categorySlug) {
       break;
     }
   }
-
   return items;
 }
 
-function setupGovdocCommand({ pattern, category, slug, label }) {
+// Step 1: list posts command handler
+function setupGovdocCommand({ pattern, slug, label, requiresGrade }) {
   cmd(
     {
       pattern,
@@ -66,23 +68,29 @@ function setupGovdocCommand({ pattern, category, slug, label }) {
       filename: __filename,
     },
     async (robin, mek, m, { from, q, sender, reply }) => {
-      if (!q || !/grade\s+\d+/i.test(q)) return reply(`❌ Example: .${pattern} grade 11`);
+      if (requiresGrade) {
+        if (!q || !/grade\s+\d+/i.test(q))
+          return reply(`❌ Example: .${pattern} grade 11`);
+      }
 
-      const input = q.trim().toLowerCase().split(/\s+/);
-      const gradeIndex = input.findIndex(w => w === "grade");
-      const grade = input[gradeIndex + 1];
-      if (!grade) return reply("❌ Grade missing. Use format like `.textbook grade 11`");
+      let categorySlug = slug;
+      if (requiresGrade) {
+        const input = q.trim().toLowerCase().split(/\s+/);
+        const gradeIndex = input.findIndex((w) => w === "grade");
+        if (gradeIndex === -1 || !input[gradeIndex + 1])
+          return reply("❌ Grade missing. Use format like `.textbook grade 11`");
+        const grade = input[gradeIndex + 1];
+        categorySlug = `${slug}/grade-${grade}`;
+      }
 
-      const slugPath = `${slug}/grade-${grade}`;
-      const items = await fetchGovdocItems(slugPath);
+      const items = await fetchGovdocItems(categorySlug);
 
-      if (!items.length) return reply(`❌ No ${label.toLowerCase()} found for grade ${grade}`);
+      if (!items.length)
+        return reply(`❌ No ${label.toLowerCase()} found${
+          requiresGrade ? ` for grade ${categorySlug.split("/")[1]}` : ""
+        }.`);
 
-      let msg = `📘 *GovDoc ${label}: Grade ${grade}*
-────────────────────
-_Reply with number to select item_
-
-`;
+      let msg = `📘 *GovDoc ${label}${requiresGrade ? `: Grade ${categorySlug.split("/")[1].replace("grade-", "")}` : ""}*\n────────────────────\n_Reply with number to select item_\n\n`;
       items.forEach((item, i) => {
         msg += `*${i + 1}.* ${item.title}\n`;
       });
@@ -93,10 +101,13 @@ _Reply with number to select item_
         step: "select",
         results: items,
         quoted: mek,
+        label,
+        requiresGrade,
       };
     }
   );
 
+  // Step 2: user selects post, parse languages and ask language selection
   cmd(
     {
       filter: (text, { sender }) =>
@@ -106,9 +117,8 @@ _Reply with number to select item_
       const pending = pendingDownloads[sender];
       const selected = parseInt(body.trim());
 
-      if (selected < 1 || selected > pending.results.length) {
+      if (selected < 1 || selected > pending.results.length)
         return reply("❌ Invalid selection.");
-      }
 
       const selectedItem = pending.results[selected - 1];
 
@@ -116,17 +126,82 @@ _Reply with number to select item_
         const { data } = await axios.get(selectedItem.link, { headers });
         const $ = cheerio.load(data);
 
-        const downloadLink = $('a[href*="/view?id="]').attr("href");
-        const langText = $('a[href*="/view?id="] button').text().trim() || "Document";
+        // Find all language options by scanning all <a> with href containing "/view?id="
+        const languages = [];
+        $("a[href*='/view?id=']").each((_, el) => {
+          const href = $(el).attr("href");
+          const lang = $(el).find("button").text().trim() || "Document";
+          if (href) {
+            languages.push({
+              lang,
+              link: href.startsWith("http") ? href : `https://govdoc.lk${href}`,
+            });
+          }
+        });
 
-        if (!downloadLink) {
+        if (!languages.length) {
+          // No languages, fallback to direct download link maybe
+          // Try direct PDF link?
+          const directDownload = $("a.btn.w-100[href*='/download/']").attr("href");
+          if (directDownload) {
+            // Send direct download PDF
+            const pdfUrl = directDownload.startsWith("http")
+              ? directDownload
+              : `https://govdoc.lk${directDownload}`;
+            // Send PDF URL as text link (or download directly with Puppeteer)
+            await robin.sendMessage(
+              from,
+              { text: `📄 Direct download link:\n${pdfUrl}` },
+              { quoted: mek }
+            );
+            delete pendingDownloads[sender];
+            return;
+          }
           delete pendingDownloads[sender];
-          return reply("⚠️ No downloadable PDF found.");
+          return reply("⚠️ No language versions found.");
         }
 
-        const fullLink = downloadLink.startsWith("http") ? downloadLink : `https://govdoc.lk${downloadLink}`;
+        let langMsg = `🌐 *Available Languages for:* _${selectedItem.title}_\n\n`;
+        languages.forEach((l, i) => {
+          langMsg += `*${i + 1}.* ${l.lang}\n`;
+        });
+        langMsg += `\n_Reply with a number (1-${languages.length}) to download._`;
 
-        const downloadDir = path.join(os.tmpdir(), `govdoc-${Date.now()}`);
+        pendingDownloads[sender] = {
+          step: "download",
+          selected: selectedItem,
+          languages,
+          quoted: mek,
+          label: pending.label,
+          requiresGrade: pending.requiresGrade,
+        };
+
+        reply(langMsg);
+      } catch (e) {
+        console.error(e);
+        delete pendingDownloads[sender];
+        reply("⚠️ Failed to fetch language options.");
+      }
+    }
+  );
+
+  // Step 3: download selected language PDF via Puppeteer
+  cmd(
+    {
+      filter: (text, { sender }) =>
+        pendingDownloads[sender] && pendingDownloads[sender].step === "download" && /^\d+$/.test(text.trim()),
+    },
+    async (robin, mek, m, { from, body, sender, reply }) => {
+      const pending = pendingDownloads[sender];
+      const selected = parseInt(body.trim());
+
+      if (selected < 1 || selected > pending.languages.length)
+        return reply("❌ Invalid selection.");
+
+      const lang = pending.languages[selected - 1];
+      const downloadDir = path.join(os.tmpdir(), `govdoc-${Date.now()}`);
+
+      try {
         fs.mkdirSync(downloadDir);
 
         const browser = await puppeteer.launch({
@@ -140,18 +215,18 @@ _Reply with number to select item_
           downloadPath: downloadDir,
         });
 
-        await page.goto(fullLink, { waitUntil: "networkidle2", timeout: 30000 });
+        await page.goto(lang.link, { waitUntil: "networkidle2", timeout: 30000 });
         await page.waitForSelector('a.btn.w-100[href*="/download/"]', { timeout: 15000 });
         await page.click('a.btn.w-100[href*="/download/"]');
 
         let fileName;
         for (let i = 0; i < 20; i++) {
-          const files = fs.readdirSync(downloadDir).filter(f => f.endsWith(".pdf"));
+          const files = fs.readdirSync(downloadDir).filter((f) => f.endsWith(".pdf"));
           if (files.length > 0) {
             fileName = files[0];
             break;
           }
-          await new Promise(res => setTimeout(res, 1000));
+          await new Promise((res) => setTimeout(res, 1000));
         }
 
         await browser.close();
@@ -160,7 +235,7 @@ _Reply with number to select item_
 
         const filePath = path.join(downloadDir, fileName);
         const pdfBuffer = fs.readFileSync(filePath);
-        const niceName = `${selectedItem.title} - ${langText}.pdf`;
+        const niceName = `${pending.selected.title} - ${lang.lang}.pdf`;
 
         await robin.sendMessage(
           from,
@@ -184,8 +259,28 @@ _Reply with number to select item_
   );
 }
 
-// 🔌 Initialize all plugins
-setupGovdocCommand({ pattern: "textbook", category: "education", slug: "text-books", label: "Textbooks" });
-setupGovdocCommand({ pattern: "tguide", category: "education", slug: "teacher-guides", label: "Teacher Guides" });
-setupGovdocCommand({ pattern: "syllabus", category: "education", slug: "syllabus", label: "Syllabus" });
-setupGovdocCommand({ pattern: "gazette", category: "education", slug: "gazette", label: "Gazette" });
+// Initialize plugins
+setupGovdocCommand({
+  pattern: "textbook",
+  slug: "text-books",
+  label: "Textbooks",
+  requiresGrade: true,
+});
+setupGovdocCommand({
+  pattern: "tguide",
+  slug: "teacher-guides",
+  label: "Teacher Guides",
+  requiresGrade: true,
+});
+setupGovdocCommand({
+  pattern: "syllabus",
+  slug: "syllabus",
+  label: "Syllabus",
+  requiresGrade: true,
+});
+setupGovdocCommand({
+  pattern: "gazette",
+  slug: "gazette",
+  label: "Gazette",
+  requiresGrade: false,
+});
