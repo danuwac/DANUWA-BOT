@@ -24,11 +24,11 @@ async (conn, mek, m, {
 │ 📘 *Term Test Papers (Grades 6-11)*
 │    └ Use: *.govdoc grade subject year*
 │    └ Ex: *.govdoc 10 history 2024*
-│─────────────────────⬣
+│──────────────────────⬣
 │ 📕 *O/L Past Papers*
 │    └ Use: *.pastpapers year subject*
 │    └ Ex: *.pastpapers 2023 maths*   
-│─────────────────────⬣
+│──────────────────────⬣
 │ 📗 *A/L Past Papers*
 │    └ Use: *.pastpapers physics*
 │    └ Short Forms: sft, et, bst
