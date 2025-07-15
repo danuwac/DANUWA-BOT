@@ -84,20 +84,27 @@ cmd(
       const $ = cheerio.load(res.data);
 
       const langButtons = [];
-      $("a[href*='/view?id=']").each((_, el) => {
-        const lang = $(el).find("button").text().trim();
-        const link = $(el).attr("href");
-        if (lang && link) {
+
+      // ✅ Check all buttons with text and href
+      $("a.btn.w-100").each((_, el) => {
+        const lang =
+          $(el).text().trim() ||
+          $(el).find("button").text().trim() ||
+          "Unknown";
+
+        const href = $(el).attr("href");
+
+        if (href && lang && !langButtons.find(l => l.link === href)) {
           langButtons.push({
             lang,
-            link: link.startsWith("http") ? link : `https://govdoc.lk${link}`,
+            link: href.startsWith("http") ? href : `https://govdoc.lk${href}`,
           });
         }
       });
 
       if (!langButtons.length) {
         delete pendingTextbook[sender];
-        return reply("⚠️ No language versions found.");
+        return reply("⚠️ No language versions found (but expected). Report this if issue continues.");
       }
 
       let langMsg = `🌐 *Available Languages for:* _${chosen.title}_\n\n`;
