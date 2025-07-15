@@ -10,35 +10,50 @@ const headers = {
   "User-Agent": "Mozilla/5.0",
   "Accept-Language": "en-US,en;q=0.9",
 };
-
-const subjectAliases = {
-  sinhala: "sinhala",
-  mathematics: "mathematics",
-  science: "science",
-  history: "history",
-  english: "english",
-  ict: "information-and-communication-technology",
-  civic: "civic-education",
-  buddhism: "buddhism",
-  christianity: "christianity",
-  islam: "islam",
-  business: "business-and-accounting-studies",
-  geography: "geography",
-  home: "home-economics",
-  art: "art",
-  drama: "drama-&-theatre",
-  music: "western-music",
-  oriental: "oriental-music",
-  dance: "dance",
-  agriculture: "agriculture-&-food-technology",
-  designm: "design-and-mechanical-technology",
-  designc: "design-and-construction-technology",
-  elek: "design-electrical-&-electronic-technology",
-};
-
 const pendingModel = {};
 
-// 🌐 Resolve URL based on type and optional subject
+
+const subjectAliases = {
+  accounting: "accounting",
+  agri: "agriculture-science",
+  agrotech: "agro-technology",
+  bio: "biology",
+  buddhism: "buddhism",
+  bst: "bio-system-technology",
+  chemistry: "chemistry",
+  civics: "civic-education",
+  comp: "combined-mathematics",
+  com: "communication-and-media-studies",
+  dance: "dance",
+  drama: "drama-and-theatre",
+  econ: "economics",
+  eng: "english",
+  et: "engineering-technology",
+  food: "food-technology",
+  geo: "geography",
+  greek: "greek-and-roman-civilization",
+  hist: "history",
+  ict: "information-and-communication-technology",
+  islam: "islam",
+  logic: "logic",
+  math: "mathematics",
+  media: "communication-and-media-studies",
+  music: "music",
+  physics: "physics",
+  polsci: "political-science",
+  sanskrit: "sanskrit",
+  sin: "sinhala",
+  tam: "tamil",
+  tech: "technology",
+  zoology: "zoology",
+  botany: "botany",
+  christianity: "christianity",
+  hinduism: "hinduism",
+  sft: "science-for-technology",
+  bs: "business-studies",
+  
+};
+
 function resolveModelURL(type, subject = "") {
   const base = "https://govdoc.lk/category/model-papers/";
   const typePath =
@@ -52,11 +67,10 @@ function resolveModelURL(type, subject = "") {
 }
 
 // 🔁 Fetch posts excluding related pages
-async function fetchModelPosts(type, subjectKey) {
+async function fetchModelPosts(type, subject) {
   const posts = [];
   let page = 1;
-  const subjectSlug = subjectKey ? subjectAliases[subjectKey] : "";
-  const baseURL = resolveModelURL(type, subjectSlug);
+  const baseURL = resolveModelURL(type, subject);
 
   while (true) {
     const url = page === 1 ? baseURL : `${baseURL}?page=${page}`;
@@ -104,21 +118,18 @@ cmd(
 
     const input = q.trim().toLowerCase().split(/\s+/);
     const type = input[0];
-    const subjectInput = input.slice(1).join("-");
+    let subject = input.slice(1).join("-");
+    if (subjectAliases[subject]) subject = subjectAliases[subject];
 
     if (!["o/l", "a/l"].includes(type))
       return reply("❌ Please specify `o/l` or `a/l`");
 
-    if (subjectInput && !subjectAliases[subjectInput]) {
-      return reply(`❌ Unknown subject \"${subjectInput}\". Use one of: ${Object.keys(subjectAliases).join(", ")}`);
-    }
-
-    const posts = await fetchModelPosts(type, subjectInput);
+    const posts = await fetchModelPosts(type, subject);
 
     if (!posts.length) return reply("❌ No model papers found.");
 
     let msg = `📘 *${type.toUpperCase()} Model Papers*`;
-    if (subjectInput) msg += ` — Subject: *${subjectInput.replace(/-/g, " ")}*`;
+    if (subject) msg += ` for *${subject.replace(/-/g, " ")}*`;
     msg += `\n────────────────────\n_Reply with number to select paper_\n\n`;
 
     posts.forEach((p, i) => {
