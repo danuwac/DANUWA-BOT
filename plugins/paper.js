@@ -18,30 +18,24 @@ async (conn, mek, m, {
         const channelName = '🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁';
         const channelInvite = '0029Vb65OhH7oQhap1fG1y3o';
 
-        const caption = `
-╭─────── ⭓ ⭓ ⭓  ─────────╮
-│🎓 𝐄𝐃𝐔𝐂𝐀𝐓𝐈𝐎𝐍𝐀𝐋 𝐙𝐎𝐍𝐄 🎓 │
+        const caption = `╭─────── ⭓ ⭓ ⭓  ─────────╮
+│   🎓 𝐄𝐃𝐔𝐂𝐀𝐓𝐈𝐎𝐍𝐀𝐋 𝐙𝐎𝐍𝐄 🎓   │
 ╰──────────────⟡───────╯
 │ 📘 *Term Test Papers (Grades 6-11)*
 │    └ Use: *.govdoc grade subject year*
 │    └ Ex: *.govdoc 10 history 2024*
-│    └ Filters: province, subject, term
-
+│─────────────────────⬣
 │ 📕 *O/L Past Papers*
 │    └ Use: *.pastpapers year subject*
-│    └ Ex: *.pastpapers 2023 maths*
-│    └ Note: Some links use 2022-2023 format
-
+│    └ Ex: *.pastpapers 2023 maths*   
+│─────────────────────⬣
 │ 📗 *A/L Past Papers*
 │    └ Use: *.pastpapers physics*
-│    └ Short Forms: sft, et, bst (e.g., *.pastpapers bst*)
-╰─────────────────────────╯
-
-🔗 *Channel:* ${channelName}
-📎 *Join & Stay Updated:* https://whatsapp.com/channel/${channelInvite}
-⚙️ Powered by: ${config.BOT_NAME || '🌀 DANUWA-MD 🌀'}
-🧩 Created by: ${config.OWNER_NAME || 'DANUKA DISANAYAKA'} ❤️`;
-
+│    └ Short Forms: sft, et, bst
+│    └ Ex: *.pastpapers bst*
+╰──────────────────────╯
+⚙️ Made with ❤️ by
+╰🔥 𝘿𝘼𝙉𝙐𝙆𝘼 𝘿𝙄𝙎𝘼𝙉𝘼𝙔𝘼𝙆𝘼 🔥`;
         await conn.sendMessage(from, {
             image: { url: bannerImg },
             caption,
