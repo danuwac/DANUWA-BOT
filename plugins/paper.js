@@ -18,21 +18,38 @@ async (conn, mek, m, {
         const channelName = '🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁';
         const channelInvite = '0029Vb65OhH7oQhap1fG1y3o';
 
-        const caption = `╭─────── ⭓ ⭓ ⭓  ─────────╮
+        const caption = `
+╭─────── ⭓ ⭓ ⭓  ─────────╮
 │   🎓 𝐄𝐃𝐔𝐂𝐀𝐓𝐈𝐎𝐍𝐀𝐋 𝐙𝐎𝐍𝐄 🎓   │
 ╰──────────────⟡───────╯
-│ 📘 *Term Test Papers (Grades 6-11)*
+│ 📘 *Term Test Papers (Grades 6–11)*
 │    └ Use: *.govdoc grade subject year*
 │    └ Ex: *.govdoc 10 history 2024*
 │──────────────────────⬣
 │ 📕 *O/L Past Papers*
 │    └ Use: *.pastpapers year subject*
-│    └ Ex: *.pastpapers 2023 maths*   
+│    └ Ex: *.pastpapers 2023 maths*
 │──────────────────────⬣
 │ 📗 *A/L Past Papers*
 │    └ Use: *.pastpapers physics*
 │    └ Short Forms: sft, et, bst
 │    └ Ex: *.pastpapers bst*
+│──────────────────────⬣
+│ 📙 *O/L & A/L Model Papers*
+│    └ Use: *.modelpapers ol/al subject*
+│    └ Ex: *.modelpapers ol science*
+│──────────────────────⬣
+│ 📚 *School Textbooks (Grade 1–13)*
+│    └ Use: *.textbook grade subject*
+│    └ Ex: *.textbook 6 tamil*
+│──────────────────────⬣
+│ 📑 *Syllabus & Teachers' Guides*
+│    └ Use: *.syllabus grade subject*
+│    └ Ex: *.syllabus 11 maths*
+│──────────────────────⬣
+│ 📰 *Government Gazette Downloads*
+│    └ Use: *.gazette keyword*
+│    └ Ex: *.gazette teaching*
 ╰──────────────────────╯
 ⚙️ Made with ❤️ by
 ╰🔥 𝘿𝘼𝙉𝙐𝙆𝘼 𝘿𝙄𝙎𝘼𝙉𝘼𝙔𝘼𝙆𝘼 🔥`;
