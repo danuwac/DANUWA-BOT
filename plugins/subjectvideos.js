@@ -30,15 +30,17 @@ cmd(
     await robin.sendMessage(from, { react: { text: "📚", key: m.key } });
 
     try {
-      // 1. Search playlist
       const searchTerm = `dp education ${exam} ${subject} playlist`;
       const result = await yts(searchTerm);
       const found = result.playlists?.[0];
 
       if (!found) return reply(`❌ No playlist found for *${subject}*.`);
 
-      // 2. Get full video list using ytpl
-      const playlist = await ytpl(found.url, { limit: 5 }); // get top 5
+      // Extract valid playlist ID
+      const playlistId = ytpl.getPlaylistID(found.url);
+
+      // Fetch full playlist info
+      const playlist = await ytpl(playlistId, { limit: 5 });
 
       let msg = `╭━〔 *📚 ${exam.toUpperCase()} SUBJECT VIDEO PLAYLIST* 〕━⬣
 ┃ 🔖 *Subject:* *${subject.toUpperCase()}*
