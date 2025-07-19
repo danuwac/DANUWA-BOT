@@ -13,6 +13,10 @@ const headers = {
 
 const pendingDownloads = {};
 const LOGO_IMAGE = "https://github.com/danuwac/DANUWA-BOT/blob/main/images/Alive.png?raw=true";
+const channelJid = '120363418166326365@newsletter'; 
+const channelName = '🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁';
+const channelInvite = '0029Vb65OhH7oQhap1fG1y3o';
+
 
 async function fetchGovdocItems(categorySlug) {
   const items = [];
@@ -106,7 +110,12 @@ function setupGovdocCommand({ pattern, slug, label, requiresGrade, heading, reac
       image: { url: LOGO_IMAGE },
       contextInfo: {
         forwardingScore: 999,
-        isForwarded: true
+        isForwarded: true,
+        forwardedNewsletterMessageInfo: {
+          newsletterJid: channelJid,
+          newsletterName: channelName,
+          serverMessageId: -1
+        }
       }
     }, { quoted: mek });
 
