@@ -98,7 +98,8 @@ function setupGovdocCommand({ pattern, slug, label, requiresGrade, heading, reac
       msg += `${emojiIndex} *${item.title}*\n\n`;
     });
 
-    msg += `💡 *Reply with a number to download.*`;
+    msg += `─────────────────────────
+💡 *Reply with a number to download.*`;
 
     const sentMsg = await robin.sendMessage(from, {
       caption: msg,
