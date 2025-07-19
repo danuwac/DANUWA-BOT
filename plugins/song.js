@@ -4,31 +4,35 @@ const yts = require("yt-search");
 
 const headers = {
   "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+  "Accept": "application/json, text/javascript, */*; q=0.01",
   "Accept-Language": "en-US,en;q=0.9",
+  "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+  "Origin": "https://en1.savetube.me",
+  "Referer": "https://en1.savetube.me/",
+  "X-Requested-With": "XMLHttpRequest",
 };
 
 cmd(
   {
     pattern: "song",
     react: "🎶",
-    desc: "Download Song from YouTube",
+    desc: "Download song from YouTube",
     category: "download",
     filename: __filename,
   },
-  async (robin, mek, m, { from, reply, q }) => {
+  async (robin, mek, m, { from, q, reply }) => {
     try {
-      if (!q) return reply("❌ *Please provide a song name or YouTube link* 🌟🎵");
+      if (!q) return reply("❌ *Enter a song name or YouTube link.*");
 
-      // 🔍 Search
       const search = await yts(q);
-      if (!search.videos.length) return reply("❌ No video found.");
+      if (!search.videos.length) return reply("❌ No videos found.");
 
       const video = search.videos[0];
       const url = video.url;
 
-      // 🧾 Send preview
-      let caption = `
+      // Preview
+      const caption = `
 🎧 *SONG DOWNLOADER*
 ────────────────────
 🎬 *Title:* ${video.title}
@@ -46,24 +50,20 @@ cmd(
         { quoted: mek }
       );
 
-      // 🔄 Convert using savetube.su backend
-      const api = "https://cdn306.savetube.su/api/ajaxSearch";
+      // Call savetube API
       const res = await axios.post(
-        api,
+        "https://en1.savetube.me/api/ajaxSearch",
         new URLSearchParams({ q: url }),
         { headers }
       );
 
-      const audioInfo = res.data.links?.mp3?.mp3128;
-      if (!audioInfo || !audioInfo.url) {
-        return reply("❌ Couldn't fetch audio file.");
-      }
+      const mp3 = res.data?.links?.mp3?.mp3128;
+      if (!mp3?.url) return reply("❌ Couldn't fetch the audio file.");
 
-      // ⏬ Send audio
       await robin.sendMessage(
         from,
         {
-          audio: { url: audioInfo.url },
+          audio: { url: mp3.url },
           mimetype: "audio/mpeg",
           fileName: `${video.title}.mp3`,
         },
@@ -71,9 +71,9 @@ cmd(
       );
 
       return reply("✅ *Enjoy your song!* 🎶");
-    } catch (e) {
-      console.log("SONG ERROR:", e);
-      reply("❌ *Error downloading song. Try another title.*");
+    } catch (err) {
+      console.error("SONG ERROR:", err);
+      reply("❌ *Failed to download. Try again later.*");
     }
   }
 );
