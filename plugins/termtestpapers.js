@@ -78,9 +78,12 @@ cmd({
   filename: __filename,
 }, async (robin, mek, m, { from, q, sender, reply }) => {
   if (!q) return reply("❌ Example: `.govdoc 10 history` or `.govdoc grade 11 ict`");
+
   await robin.sendMessage(from, { react: { text: "📚", key: m.key } });
+
   const input = q.trim().toLowerCase().split(/\s+/);
   let grade = "", subject = "";
+
   if (input[0] === "grade" && /^\d+$/.test(input[1])) {
     grade = input[1];
     subject = input.slice(2).join("-").trim();
@@ -88,12 +91,15 @@ cmd({
     grade = input[0];
     subject = input.slice(1).join("-").trim();
   }
+
   if (!grade) return reply("❌ Invalid format. Use `.govdoc 10 ict`");
   if (subjectAliases[subject]) subject = subjectAliases[subject];
+
   const gradeSlug = subject ? `grade-${grade}/${subject}` : `grade-${grade}`;
   const posts = await fetchGovdocPosts(gradeSlug);
+
   if (!posts.length) return reply(`❌ No papers found for *${gradeSlug}*`);
-  
+
   const numberEmojis = ["0️⃣","1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣"];
 
   let msg = `╔═━━━━━━━◥◣◆◢◤━━━━━━━━═╗
@@ -135,7 +141,7 @@ cmd({
       },
     },
   }, { quoted: mek });
-}); // ← This closing was MISSING
+});
 
 cmd({
   filter: (text, { sender }) =>
@@ -188,8 +194,8 @@ cmd({
 cmd({
   filter: (text, { sender }) =>
     pendingGovDoc[sender] && pendingGovDoc[sender].step === "download" && /^\d+$/.test(text.trim()),
-}, async (robin, mek, m, { from, body, sender, reply }) => 
-  await robin.sendMessage(from, { react: { text: "⬇️", key: m.key } }));
+}, async (robin, mek, m, { from, body, sender, reply }) => {
+  await robin.sendMessage(from, { react: { text: "⬇️", key: m.key } });
   const pending = pendingGovDoc[sender];
   const selected = parseInt(body.trim());
   if (selected < 1 || selected > pending.languages.length) {
@@ -225,7 +231,7 @@ cmd({
     const filePath = path.join(downloadDir, fileName);
     const pdfBuffer = fs.readFileSync(filePath);
     const niceName = `${pending.selected.title} - ${lang.lang}.pdf`;
-    await robin.sendMessage(
+    const sentMsg = await robin.sendMessage(
       from,
       {
         document: pdfBuffer,
@@ -238,6 +244,7 @@ cmd({
       },
       { quoted: mek }
     );
+
     await robin.sendMessage(
       from,
       {
