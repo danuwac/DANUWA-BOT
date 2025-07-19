@@ -99,7 +99,7 @@ cmd({
   let msg = `╔═━━━━━━━◥◣◆◢◤━━━━━━━━═╗
 ║     🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁    ║
 ╚═━━━━━━━◢◤◆◥◣━━━━━━━━═╝
-      *📂 TERM TEST PAPERS 📂*
+       *📂 TERM TEST PAPERS 📂*
 ┏━━━━━━━━━━━━━━━━━━━━━━┓
 ┃ 🔰 𝗖𝗛𝗢𝗢𝗦𝗘 𝗣𝗔𝗣𝗘𝗥 𝗡𝗢.
 ┃ 💬 𝗥𝗘𝗣𝗟𝗬 𝗧𝗢 𝗡𝗨𝗠𝗕𝗘𝗥❕
@@ -166,11 +166,11 @@ cmd({
       delete pendingGovDoc[sender];
       return reply("⚠️ No language options found.");
     }
-    let langMsg = `🌐 Available Languages for: _${selectedResult.title}_\n\n`;
+    let langMsg = `🌐 *Available Languages for:* *_${selectedResult.title}_*\n\n`;
     languages.forEach((l, i) => {
       langMsg += `*${i + 1}.* ${l.lang}\n`;
     });
-    langMsg += `\n_Reply with a number (1-${languages.length}) to download._`;
+    langMsg += `\n_💬 *Reply with a number (1-${languages.length}) to download._*`;
     pendingGovDoc[sender] = {
       step: "download",
       selected: selectedResult,
@@ -188,7 +188,8 @@ cmd({
 cmd({
   filter: (text, { sender }) =>
     pendingGovDoc[sender] && pendingGovDoc[sender].step === "download" && /^\d+$/.test(text.trim()),
-}, async (robin, mek, m, { from, body, sender, reply }) => {
+}, async (robin, mek, m, { from, body, sender, reply }) => 
+  await robin.sendMessage(from, { react: { text: "⬇️", key: m.key } });
   const pending = pendingGovDoc[sender];
   const selected = parseInt(body.trim());
   if (selected < 1 || selected > pending.languages.length) {
@@ -237,6 +238,16 @@ cmd({
       },
       { quoted: mek }
     );
+    await robin.sendMessage(
+      from,
+      {
+        react: {
+          text: "✅",
+          key: sentMsg.key,
+        },
+      }
+    );
+
     fs.unlinkSync(filePath);
     fs.rmdirSync(downloadDir);
     delete pendingGovDoc[sender];
