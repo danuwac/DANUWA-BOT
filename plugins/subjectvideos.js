@@ -25,7 +25,6 @@ cmd(
     await robin.sendMessage(from, { react: { text: "📚", key: m.key } });
 
     try {
-      // Search for playlist using yt-search
       const searchTerm = `dp education ${exam} ${subject} playlist`;
       const result = await yts(searchTerm);
       const found = result.playlists?.[0];
@@ -34,10 +33,11 @@ cmd(
         return reply(`❌ No playlist found for *${subject}*.`);
       }
 
-      // Use youtube-playlist to fetch playlist details + videos
       const data = await youtubePlaylist(found.url, ["id", "title", "url", "duration"]);
 
-      // data looks like { title: 'Playlist Title', videos: [{id, title, url, duration}, ...] }
+      if (!data || !Array.isArray(data.videos) || data.videos.length === 0) {
+        return reply(`❌ No videos found in the playlist for *${subject}*.`);
+      }
 
       let msg = `╭━〔 *📚 ${exam.toUpperCase()} SUBJECT VIDEO PLAYLIST* 〕━⬣
 ┃ 🔖 *Subject:* *${subject.toUpperCase()}*
