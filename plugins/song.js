@@ -1,171 +1,70 @@
-const { cmd, commands } = require("../command");
+const { cmd } = require("../command");
 const yts = require("yt-search");
-const axios = require("axios");
-
-// Custom ytmp3 with headers for cdn306.savetube.su
-async function ytmp3(url, quality = "128") {
-  try {
-    const response = await axios.post(
-      "https://cdn306.savetube.su/v2/info",
-      JSON.stringify({ url }),
-      {
-        headers: {
-          Accept: "application/json, text/plain, */*",
-          "Content-Type": "application/json",
-          "User-Agent":
-            "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Mobile Safari/537.36",
-          Referer: "https://yt.savetube.me/1kejjj1?id=362796039",
-          Origin: "https://yt.savetube.me",
-          Connection: "keep-alive",
-          DNT: "1",
-          "Sec-Fetch-Site": "same-site",
-          "Sec-Fetch-Mode": "cors",
-          "Sec-Fetch-Dest": "empty",
-          "Accept-Encoding": "gzip, deflate, br",
-          "Accept-Language": "en-US,en;q=0.9",
-        },
-      }
-    );
-
-    if (!response.data || !response.data.data) throw new Error("No data found");
-
-    const data = response.data.data;
-
-    // Find matching audio quality URL
-    let audio = data.formats.find(
-      (f) => f.audioQuality === quality && f.mimeType.startsWith("audio")
-    );
-    if (!audio) {
-      // fallback to any audio format
-      audio = data.formats.find((f) => f.mimeType.startsWith("audio"));
-    }
-    if (!audio) throw new Error("No suitable audio format found");
-
-    return {
-      download: {
-        url: audio.url,
-      },
-    };
-  } catch (err) {
-    throw new Error("❌ Couldn't fetch audio file.");
-  }
-}
+const ytdl = require("ytdl-core");
 
 cmd(
   {
     pattern: "song",
     react: "🎶",
-    desc: "Download Song",
+    desc: "Download Song from YouTube",
     category: "download",
     filename: __filename,
   },
-  async (
-    robin,
-    mek,
-    m,
-    {
-      from,
-      quoted,
-      body,
-      isCmd,
-      command,
-      args,
-      q,
-      isGroup,
-      sender,
-      senderNumber,
-      botNumber2,
-      botNumber,
-      pushname,
-      isMe,
-      isOwner,
-      groupMetadata,
-      groupName,
-      participants,
-      groupAdmins,
-      isBotAdmins,
-      isAdmins,
-      reply,
-    }
-  ) => {
+  async (robin, mek, m, { from, reply, q }) => {
     try {
       if (!q) return reply("❌ *Please provide a song name or YouTube link* 🌟🎵");
 
-      // Search for the video
-      const search = await yts(q);
-      const data = search.videos[0];
-      const url = data.url;
-
-      // Song metadata description
-      let desc = `
-           🌟 𝗪𝗘𝗟𝗖𝗢𝗠𝗘 𝗧𝗢 🌟    
-════════════════════════     
-🔮  Ｄ  Ａ  Ｎ  Ｕ  Ｗ  Ａ  －  Ｍ  Ｄ  🔮  
-      🎧 𝙎𝙊𝙉𝙂 𝘿𝙊𝙒𝙉𝙇𝙊𝘼𝘿𝙀𝙍 🎧  
-════════════════════════   
-
-🎼 Let the rhythm guide you... 🎼
-🚀 Pow. By *DANUKA DISANAYAKA* 🔥
-─────────────────────────
-
-🎬 *Title:* ${data.title}
-⏱️ *Duration:* ${data.timestamp}
-📅 *Uploaded:* ${data.ago}
-👀 *Views:* ${data.views.toLocaleString()}
-🔗 *Watch Here:* ${data.url}
-
-─────────────────────────
-🎼 Made with ❤️ by *DANUKA DISANAYAKA💫*
-`;
-
-      // Send metadata thumbnail message
-      await robin.sendMessage(
-        from,
-        { image: { url: data.thumbnail }, caption: desc },
-        { quoted: mek }
-      );
-
-      // Download the audio using patched ytmp3
-      const quality = "128"; // Default quality
-      const songData = await ytmp3(url, quality);
-
-      // Validate song duration (limit: 30 minutes)
-      let durationParts = data.timestamp.split(":").map(Number);
-      let totalSeconds =
-        durationParts.length === 3
-          ? durationParts[0] * 3600 + durationParts[1] * 60 + durationParts[2]
-          : durationParts[0] * 60 + durationParts[1];
-
-      if (totalSeconds > 1800) {
-        return reply("⏳ *Sorry, audio files longer than 30 minutes are not supported.*");
+      // Search YouTube if query is not a valid URL
+      let videoUrl = q;
+      if (!ytdl.validateURL(q)) {
+        const search = await yts(q);
+        if (!search || !search.videos.length)
+          return reply("❌ *No results found for your query*.");
+        videoUrl = search.videos[0].url;
       }
 
-      // Send audio file
+      const info = await ytdl.getInfo(videoUrl);
+
+      // Limit duration to 30 minutes
+      const lengthSeconds = parseInt(info.videoDetails.lengthSeconds, 10);
+      if (lengthSeconds > 1800)
+        return reply("⏳ *Sorry, audio files longer than 30 minutes are not supported.*");
+
+      const title = info.videoDetails.title;
+      const thumbnail = info.videoDetails.thumbnails.pop().url;
+      const duration = new Date(lengthSeconds * 1000).toISOString().substr(11, 8);
+
+      // Send metadata message with thumbnail
+      const caption = `
+🎧 *Song Download*
+─────────────────────
+🎬 Title: ${title}
+⏳ Duration: ${duration}
+🔗 Link: ${videoUrl}
+─────────────────────
+🎼 Made with ❤️ by *DANUKA DISANAYAKA💫*
+      `.trim();
+
+      await robin.sendMessage(from, { image: { url: thumbnail }, caption }, { quoted: mek });
+
+      // Download audio stream from YouTube (highest quality audio only)
+      const audioStream = ytdl(videoUrl, { filter: "audioonly", quality: "highestaudio" });
+
+      // Send audio file as stream
       await robin.sendMessage(
         from,
         {
-          audio: { url: songData.download.url },
+          audio: audioStream,
           mimetype: "audio/mpeg",
+          fileName: `${title}.mp3`,
         },
         { quoted: mek }
       );
 
-      // Send as a document (optional)
-      await robin.sendMessage(
-        from,
-        {
-          document: { url: songData.download.url },
-          mimetype: "audio/mpeg",
-          fileName: `${data.title}.mp3`,
-          caption: "🎶 *Your song is ready to be played!* \n🎼 Made with ❤️ by *DANUKA DISANAYAKA💫*",
-        },
-        { quoted: mek }
-      );
-
-      return reply("✅ *Thank you for using DANUWA-MD! Enjoy your music* 🎧💖");
+      return reply("✅ *Here is your song! Enjoy 🎶*");
     } catch (e) {
-      console.log(e);
-      reply(`❌ *Error:* ${e.message} 😞`);
+      console.error(e);
+      return reply("❌ *Failed to download the song. Please try again later.*");
     }
   }
 );
