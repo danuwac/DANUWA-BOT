@@ -40,7 +40,7 @@ cmd(
       const msg = `╔═━━━━━━━◥◣◆◢◤━━━━━━━━═╗
 ║     🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁    ║
 ╚═━━━━━━━◢◤◆◥◣━━━━━━━━═╝
-       *📺 SUBJECT VIDEO PLAYLIST 📺*
+*📺 SUBJECT VIDEO PLAYLIST 📺*
 ┏━━━━━━━━━━━━━━━━━━━━━━┓
 ┃ 🔰 𝗘𝗫𝗔𝗠 𝗧𝗬𝗣𝗘: *${exam.toUpperCase()}*
 ┃ 📚 𝗦𝗨𝗕𝗝𝗘𝗖𝗧: *${subject.toUpperCase()}*
