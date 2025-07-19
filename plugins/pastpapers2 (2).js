@@ -11,7 +11,7 @@ const headers = {
   "Accept-Language": "en-US,en;q=0.9",
 };
 
-// Subject aliases for user convenience
+// Subject aliases for convenience
 const subjectAliases = {
   commerce: "business accounting studies",
   ict: "information communication technology",
@@ -35,31 +35,27 @@ const subjectAliases = {
 
 const pendingGovDoc = {};
 
-// Helper function: checks if all words in subjectAlias appear in title (flexible match)
-function subjectMatch(title, subjectAlias) {
-  const clean = (str) =>
-    str
-      .toLowerCase()
-      .replace(/[&.,\-]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-
-  const cleanTitle = clean(title);
-  const cleanSubject = clean(subjectAlias);
-
-  return cleanSubject
-    .split(" ")
-    .every((word) => word && cleanTitle.includes(word));
+// Normalize string: lowercase, replace special chars with spaces, collapse spaces
+function normalizeText(str) {
+  return str.toLowerCase().replace(/[&.,\-]/g, " ").replace(/\s+/g, " ").trim();
 }
 
-// Fetch posts from grade page, filter by subject inside <h5.cate-title>
+// Check if normalized subject appears anywhere in normalized title
+function titleContainsSubject(title, subject) {
+  const normTitle = normalizeText(title);
+  const normSubject = normalizeText(subject);
+  return normTitle.includes(normSubject);
+}
+
+// Fetch all posts from grade page, filter by subject keyword anywhere in title
 async function fetchGovdocPosts(grade, subject) {
   const baseUrl = `https://govdoc.lk/category/term-test-papers/grade-${grade}/`;
   const posts = [];
   let page = 1;
 
   while (true) {
-    const url = page === 1 ? baseUrl : `${baseUrl}page/${page}/`;
+    // Govdoc pagination uses ?page= format or /page/x/ ? Let's keep both options and try ?page=
+    const url = page === 1 ? baseUrl : `${baseUrl}?page=${page}`;
     try {
       const res = await axios.get(url, { headers });
       const $ = cheerio.load(res.data);
@@ -76,7 +72,7 @@ async function fetchGovdocPosts(grade, subject) {
         if (
           link &&
           title &&
-          subjectMatch(title, subject) &&
+          titleContainsSubject(title, subject) &&
           !posts.find((p) => p.link === link)
         ) {
           posts.push({ title, link });
@@ -96,7 +92,7 @@ async function fetchGovdocPosts(grade, subject) {
   return posts;
 }
 
-// Download PDF with Puppeteer, returns filepath or null
+// Download PDF using Puppeteer
 async function downloadPDF(url) {
   const downloadDir = path.join(os.tmpdir(), `govdoc-${Date.now()}`);
   fs.mkdirSync(downloadDir);
@@ -105,6 +101,7 @@ async function downloadPDF(url) {
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
+
   const page = await browser.newPage();
   await page._client().send("Page.setDownloadBehavior", {
     behavior: "allow",
@@ -135,7 +132,7 @@ async function downloadPDF(url) {
   return path.join(downloadDir, fileName);
 }
 
-// Step 1: Command to list papers by grade + subject
+// Step 1: Command - get list of papers by grade + subject
 cmd(
   {
     pattern: "govdoc",
@@ -163,7 +160,7 @@ cmd(
 
     if (!subject) return reply("❌ Please specify a subject.");
 
-    // Map alias to real subject name if exists
+    // Use alias mapping if exists
     subject = subjectAliases[subject] || subject;
 
     await m.react("📚");
@@ -191,7 +188,7 @@ cmd(
   }
 );
 
-// Step 2: User replies with number to download
+// Step 2: User selects paper number to download
 cmd(
   {
     filter: (text, { sender }) =>
