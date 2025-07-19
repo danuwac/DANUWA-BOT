@@ -1,56 +1,54 @@
 const { cmd } = require("../command");
 const yts = require("yt-search");
-const youtubePlaylist = require("youtube-playlist");
 
 cmd(
   {
     pattern: "subjectvideos",
-    desc: "Get subject video playlist from DP Education (A/L or O/L) with preview using youtube-playlist",
+    desc: "Get subject video playlist from DP Education (A/L or O/L)",
     category: "education",
     react: "📚",
     filename: __filename,
   },
   async (robin, mek, m, { from, q, reply }) => {
-    if (!q) return reply("❌ Example:\n`.subjectvideos al biology`\n`.subjectvideos ol maths`");
-
-    const input = q.trim().toLowerCase().split(" ");
-    const exam = input[0];
-    const subject = input.slice(1).join(" ");
-
-    if (!["al", "ol"].includes(exam)) {
-      return reply("❌ Please specify `al` or `ol`. Example:\n`.subjectvideos al ict`\n`.subjectvideos ol science`");
+    const input = q.trim().toLowerCase();
+    if (!input) {
+      return reply("❌ Example:\n`.subjectvideos al biology`\n`.subjectvideos o/l maths`");
     }
-    if (!subject) return reply("❌ Please provide a subject after exam type.");
+
+    const [exam, ...subjectWords] = input.split(" ");
+    const subject = subjectWords.join(" ");
+
+    if (!["a/l", "o/l"].includes(exam)) {
+      return reply("❌ Please specify `a/l` or `o/l`. Example:\n`.subjectvideos a/l ict`\n`.subjectvideos o/l science`");
+    }
+
+    if (!subject) {
+      return reply("❌ Please provide a subject after exam type. Example: `.subjectvideos a/l physics`");
+    }
 
     await robin.sendMessage(from, { react: { text: "📚", key: m.key } });
 
     try {
       const searchTerm = `dp education ${exam} ${subject} playlist`;
       const result = await yts(searchTerm);
-      const found = result.playlists?.[0];
+      const playlist = result.playlists[0];
 
-      if (!found || typeof found.url !== "string" || !found.url.length) {
-        return reply(`❌ No playlist found for *${subject}*.`);
+      if (!playlist) {
+        return reply(`❌ No ${exam.toUpperCase()} playlist found for *${subject}*.`);
       }
 
-      const data = await youtubePlaylist(found.url, ["id", "title", "url", "duration"]);
-
-      if (!data || !Array.isArray(data.videos) || data.videos.length === 0) {
-        return reply(`❌ No videos found in the playlist for *${subject}*.`);
-      }
-
-      let msg = `╭━〔 *📚 ${exam.toUpperCase()} SUBJECT VIDEO PLAYLIST* 〕━⬣
-┃ 🔖 *Subject:* *${subject.toUpperCase()}*
-┃ 🎬 *Title:* ${data.title}
-┃ 🔗 *Playlist:* ${found.url}
-┃ 📊 *Videos:* ${data.videos.length}
-╰──────────────⬣
-
-📺 *Top Videos Preview:*\n`;
-
-      data.videos.slice(0, 3).forEach((video, i) => {
-        msg += `\n*${i + 1}.* ${video.title}\n⏱ ${video.duration}\n🔗 ${video.url}\n`;
-      });
+      const msg = `╔═━━━━━━━◥◣◆◢◤━━━━━━━━═╗
+║     🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁    ║
+╚═━━━━━━━◢◤◆◥◣━━━━━━━━═╝
+       *📺 SUBJECT VIDEO PLAYLIST 📺*
+┏━━━━━━━━━━━━━━━━━━━━━━┓
+┃ 🔰 𝗘𝗫𝗔𝗠 𝗧𝗬𝗣𝗘: *${exam.toUpperCase()}*
+┃ 📚 𝗦𝗨𝗕𝗝𝗘𝗖𝗧: *${subject.toUpperCase()}*
+┗━━━━━━━━━━━━━━━━━━━━━━┛
+┃ 🎬 *TITLE:* ${playlist.title}
+┃ 📊 *VIDEOS:* ${playlist.videoCount}
+┃ 🔗 *LINK:* ${playlist.url}
+╰─🔥 𝘿𝘼𝙉𝙐𝙆𝘼 𝘿𝙄𝙎𝘼𝙉𝘼𝙔𝘼𝙆𝘼 🔥─╯`;
 
       await robin.sendMessage(
         from,
@@ -58,12 +56,13 @@ cmd(
           text: msg,
           contextInfo: {
             externalAdReply: {
-              title: data.title,
-              body: "DP Education YouTube Playlist",
-              thumbnailUrl: `https://i.ytimg.com/vi/${data.videos[0]?.id}/hqdefault.jpg`,
+              title: `DP Education - ${exam.toUpperCase()} Playlist`,
+              body: playlist.title,
+              thumbnailUrl: playlist.image,
               mediaType: 1,
               renderLargerThumbnail: true,
-              sourceUrl: found.url,
+              showAdAttribution: true,
+              sourceUrl: playlist.url,
             },
           },
         },
@@ -71,7 +70,7 @@ cmd(
       );
     } catch (e) {
       console.error("❌ Playlist fetch failed:", e);
-      reply("⚠️ Failed to fetch playlist or preview.");
+      reply("⚠️ Failed to fetch playlist. Please try again later.");
     }
   }
 );
