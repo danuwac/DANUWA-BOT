@@ -1,6 +1,55 @@
 const { cmd, commands } = require("../command");
 const yts = require("yt-search");
-const { ytmp3 } = require("@vreden/youtube_scraper");
+const axios = require("axios");
+
+// Custom ytmp3 with headers for cdn306.savetube.su
+async function ytmp3(url, quality = "128") {
+  try {
+    const response = await axios.post(
+      "https://cdn306.savetube.su/v2/info",
+      JSON.stringify({ url }),
+      {
+        headers: {
+          Accept: "application/json, text/plain, */*",
+          "Content-Type": "application/json",
+          "User-Agent":
+            "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Mobile Safari/537.36",
+          Referer: "https://yt.savetube.me/1kejjj1?id=362796039",
+          Origin: "https://yt.savetube.me",
+          Connection: "keep-alive",
+          DNT: "1",
+          "Sec-Fetch-Site": "same-site",
+          "Sec-Fetch-Mode": "cors",
+          "Sec-Fetch-Dest": "empty",
+          "Accept-Encoding": "gzip, deflate, br",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+      }
+    );
+
+    if (!response.data || !response.data.data) throw new Error("No data found");
+
+    const data = response.data.data;
+
+    // Find matching audio quality URL
+    let audio = data.formats.find(
+      (f) => f.audioQuality === quality && f.mimeType.startsWith("audio")
+    );
+    if (!audio) {
+      // fallback to any audio format
+      audio = data.formats.find((f) => f.mimeType.startsWith("audio"));
+    }
+    if (!audio) throw new Error("No suitable audio format found");
+
+    return {
+      download: {
+        url: audio.url,
+      },
+    };
+  } catch (err) {
+    throw new Error("❌ Couldn't fetch audio file.");
+  }
+}
 
 cmd(
   {
@@ -76,7 +125,7 @@ cmd(
         { quoted: mek }
       );
 
-      // Download the audio using @vreden/youtube_scraper
+      // Download the audio using patched ytmp3
       const quality = "128"; // Default quality
       const songData = await ytmp3(url, quality);
 
