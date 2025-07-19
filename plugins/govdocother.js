@@ -80,7 +80,7 @@ function setupGovdocCommand({ pattern, slug, label, requiresGrade, heading, reac
     let msg = `╔═━━━━━━━◥◣◆◢◤━━━━━━━━═╗
 ║     🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁    ║
 ╚═━━━━━━━◢◤◆◥◣━━━━━━━━═╝
-    📂 ${heading.toUpperCase()} 📂
+        📂 *${heading.toUpperCase()}* 📂
 ┏━━━━━━━━━━━━━━━━━━━━━━┓
 ┃ 🔰 𝗖𝗛𝗢𝗢𝗦𝗘 𝗗𝗢𝗖𝗨𝗠𝗘𝗡𝗧 𝗡𝗢.
 ┃ 💬 𝗥𝗘𝗣𝗟𝗬 𝗧𝗢 𝗡𝗨𝗠𝗕𝗘𝗥❕
@@ -228,10 +228,10 @@ function setupGovdocCommand({ pattern, slug, label, requiresGrade, heading, reac
         document: pdfBuffer,
         mimetype: "application/pdf",
         fileName: niceName,
-        caption: `╭━[ *✅ DOWNLOAD COMPLETE ✅* ]━⬣
+        caption: `╭[ *✅ DOWNLOAD COMPLETE ✅* ]━⬣
 ┃ 📄 ${niceName}
-┃ ⚙️ Made with ❤️ by DANUKA
-╰─🔥 DANUWA-MD 🔥─╯`
+┃⚙️ Made with ❤️ by
+╰🔥 𝘿𝘼𝙉𝙐𝙆𝘼 𝘿𝙄𝙎𝘼𝙉𝘼𝙔𝘼𝙆𝘼 🔥`
       }, { quoted: mek });
 
       fs.unlinkSync(filePath);
