@@ -14,7 +14,7 @@ cmd(
     try {
       if (!q) return reply("❌ *Please provide a song name or YouTube link* 🌟🎵");
 
-      // Search YouTube if query is not a valid URL
+      // Search for video
       let videoUrl = q;
       if (!ytdl.validateURL(q)) {
         const search = await yts(q);
@@ -24,47 +24,61 @@ cmd(
       }
 
       const info = await ytdl.getInfo(videoUrl);
+      const title = info.videoDetails.title;
+      const lengthSeconds = parseInt(info.videoDetails.lengthSeconds);
 
-      // Limit duration to 30 minutes
-      const lengthSeconds = parseInt(info.videoDetails.lengthSeconds, 10);
       if (lengthSeconds > 1800)
         return reply("⏳ *Sorry, audio files longer than 30 minutes are not supported.*");
 
-      const title = info.videoDetails.title;
       const thumbnail = info.videoDetails.thumbnails.pop().url;
       const duration = new Date(lengthSeconds * 1000).toISOString().substr(11, 8);
 
-      // Send metadata message with thumbnail
+      // Send preview
       const caption = `
-🎧 *Song Download*
+🎧 *SONG DOWNLOAD*
 ─────────────────────
-🎬 Title: ${title}
-⏳ Duration: ${duration}
-🔗 Link: ${videoUrl}
+🎬 *Title:* ${title}
+⏳ *Duration:* ${duration}
+🔗 *Link:* ${videoUrl}
 ─────────────────────
 🎼 Made with ❤️ by *DANUKA DISANAYAKA💫*
-      `.trim();
+`.trim();
 
       await robin.sendMessage(from, { image: { url: thumbnail }, caption }, { quoted: mek });
 
-      // Download audio stream from YouTube (highest quality audio only)
-      const audioStream = ytdl(videoUrl, { filter: "audioonly", quality: "highestaudio" });
+      // Get audio URL manually (with headers patch)
+      const format = ytdl.chooseFormat(info.formats, {
+        filter: "audioonly",
+        quality: "highestaudio",
+      });
 
-      // Send audio file as stream
+      if (!format || !format.url) throw new Error("Couldn't fetch audio file.");
+
+      // Add headers to avoid 410
+      const headers = {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+      };
+
+      // Send audio
       await robin.sendMessage(
         from,
         {
-          audio: audioStream,
+          audio: {
+            url: format.url,
+            headers,
+          },
           mimetype: "audio/mpeg",
           fileName: `${title}.mp3`,
         },
         { quoted: mek }
       );
 
-      return reply("✅ *Here is your song! Enjoy 🎶*");
-    } catch (e) {
-      console.error(e);
-      return reply("❌ *Failed to download the song. Please try again later.*");
+      reply("✅ *Here is your song! Enjoy 🎶*");
+    } catch (err) {
+      console.error(err);
+      reply("❌ *Couldn't fetch audio file.* Please try again later.");
     }
   }
 );
