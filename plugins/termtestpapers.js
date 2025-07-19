@@ -15,6 +15,7 @@ const pendingGovDoc = {};
 const LOGO_IMAGE = "https://github.com/danuwac/DANUWA-BOT/blob/main/images/Alive.png?raw=true";
 const channelJid = "120363418166326365@newsletter";
 const channelName = "🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁";
+
 const subjectAliases = {
   commerce: "business--accounting-studies",
   ict: "information-communication-technology-ict",
@@ -108,7 +109,13 @@ cmd({
   posts.forEach((post, i) => {
     msg += `*${i + 1}.* ${post.title}\n`;
   });
-  const sentMsg = await robin.sendMessage(from, {
+
+  pendingGovDoc[sender] = {
+    step: "select",
+    results: posts,
+  };
+
+  await robin.sendMessage(from, {
     caption: msg,
     image: { url: LOGO_IMAGE },
     contextInfo: {
@@ -121,7 +128,8 @@ cmd({
       },
     },
   }, { quoted: mek });
-  
+}); // ← This closing was MISSING
+
 cmd({
   filter: (text, { sender }) =>
     pendingGovDoc[sender] && pendingGovDoc[sender].step === "select" && /^\d+$/.test(text.trim()),
