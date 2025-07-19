@@ -38,7 +38,7 @@ const menus = [
     { pattern: "fun", title: "🎉 FUN" },
     { pattern: "main", title: "🏠 MAIN" },
     { pattern: "owner", title: "👑 OWNER" },
-    { pattern: "other", title: "📂 OTHER" }
+    { pattern: "other", title: "📂 OTHER" },
     { pattern: "education", title: "🎓 EDUCATION" }
 ];
 
