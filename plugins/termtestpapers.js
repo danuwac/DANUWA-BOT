@@ -93,6 +93,8 @@ cmd({
   const gradeSlug = subject ? `grade-${grade}/${subject}` : `grade-${grade}`;
   const posts = await fetchGovdocPosts(gradeSlug);
   if (!posts.length) return reply(`❌ No papers found for *${gradeSlug}*`);
+  
+  const numberEmojis = ["0️⃣","1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣"];
 
   let msg = `╔═━━━━━━━◥◣◆◢◤━━━━━━━━═╗
 ║     🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁    ║
@@ -107,12 +109,13 @@ cmd({
 ┃ 📊 *RESULTS:* *${posts.length}*
 ╰─🔥 𝘿𝘼𝙉𝙐𝙆𝘼 𝘿𝙄𝙎𝘼𝙉𝘼𝙔𝘼𝙆𝘼 🔥─╯\n\n`;
 
-  const numberEmojis = ["0️⃣","1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"];
-
-  posts.forEach((post, i) => {
-    const emoji = numberEmojis[i + 1] || `*${i + 1}.*`;
-    msg += `${emoji} *${post.title}*\n`;
+  items.forEach((item, i) => {
+    const emojiIndex = (i + 1).toString().split("").map(n => numberEmojis[n]).join("");
+    msg += `${emojiIndex} *${item.title}*\n\n`;
   });
+
+  msg += `─────────────────────────
+💡 *Reply with a number to download.*`;
 
   pendingGovDoc[sender] = {
     step: "select",
