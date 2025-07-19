@@ -71,7 +71,8 @@
     "@sl-code-lords/movie-dl": "^1.1.1",
     "@mrnima/tiktok-downloader": "^1.0.0",
     "ruhend-scraper": "^9.0.1",
-    "youtube-playlist": "^1.0.4"
+    "youtube-playlist": "^1.0.4",
+    "ytdl-core": "^4.11.5"
       },
   "resolutions": {
     "libsignal-node": "https://github.com/adiwajshing/libsignal-node"
