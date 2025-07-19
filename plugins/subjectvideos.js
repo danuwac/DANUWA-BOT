@@ -4,7 +4,7 @@ const ytpl = require("ytpl");
 
 cmd(
   {
-    pattern: "subjectvideos ?(.*)",
+    pattern: "subjectvideos",
     desc: "Get subject video playlist from DP Education (A/L or O/L) with preview",
     category: "education",
     react: "📚",
