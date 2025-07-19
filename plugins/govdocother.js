@@ -1,183 +1,251 @@
-const { cmd } = require("../command");
-const axios = require("axios");
-const cheerio = require("cheerio");
-const puppeteer = require("puppeteer");
-const fs = require("fs");
-const path = require("path");
-const os = require("os");
+const { cmd } = require("../command")
+const axios = require("axios")
+const cheerio = require("cheerio")
+const puppeteer = require("puppeteer")
+const fs = require("fs")
+const path = require("path")
+const os = require("os")
 
 const headers = {
   "User-Agent": "Mozilla/5.0",
-  "Accept-Language": "en-US,en;q=0.9",
-};
+  "Accept-Language": "en-US,en;q=0.9"
+}
 
-const pendingDownloads = {};
-const LOGO_IMAGE = "https://github.com/danuwac/DANUWA-BOT/blob/main/images/Alive.png?raw=true";
-
-const channelJid = '120363418166326365@newsletter';
-const channelName = '🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁';
-const channelInvite = '0029Vb65OhH7oQhap1fG1y3o';
+const pendingDownloads = {}
+const LOGO_IMAGE = "https://github.com/danuwac/DANUWA-BOT/blob/main/images/Alive.png?raw=true"
 
 async function fetchGovdocItems(categorySlug) {
-  const items = [];
-  let page = 1;
+  const items = []
+  let page = 1
   while (true) {
     const url = page === 1
       ? `https://govdoc.lk/category/${categorySlug}`
-      : `https://govdoc.lk/category/${categorySlug}?page=${page}`;
+      : `https://govdoc.lk/category/${categorySlug}?page=${page}`
     try {
-      const res = await axios.get(url, { headers });
-      const $ = cheerio.load(res.data);
-      const cards = $("a.custom-card");
-      if (cards.length === 0) break;
+      const res = await axios.get(url, { headers })
+      const $ = cheerio.load(res.data)
+      const cards = $("a.custom-card")
+      if (cards.length === 0) break
 
-      let newItems = 0;
+      let newItems = 0
       cards.each((_, el) => {
-        const link = $(el).attr("href");
-        const title = $(el).find("h5.cate-title").text().trim();
+        const link = $(el).attr("href")
+        const title = $(el).find("h5.cate-title").text().trim()
         if (link && title && !items.find((p) => p.link === link)) {
-          items.push({ title, link });
-          newItems++;
+          items.push({ title, link })
+          newItems++
         }
-      });
-      if (newItems === 0) break;
-      page++;
+      })
+      if (newItems === 0) break
+      page++
     } catch (err) {
-      break;
+      break
     }
   }
-  return items;
+  return items
 }
 
 function setupGovdocCommand({ pattern, slug, label, requiresGrade, heading, reactionEmoji }) {
-  cmd({ pattern, react: reactionEmoji, desc: `Download ${label} from govdoc.lk`, category: "education", filename: __filename }, async (robin, mek, m, { from, q, sender, reply }) => {
-    if (requiresGrade && (!q || !/grade\s+\d+/i.test(q))) return reply(`❌ Example: .${pattern} grade 11`);
+  cmd({
+    pattern,
+    react: reactionEmoji,
+    desc: `Download ${label} from govdoc.lk`,
+    category: "education",
+    filename: __filename
+  }, async (robin, mek, m, { from, q, sender, reply }) => {
 
-    let categorySlug = slug;
-    let gradeTerm = "";
-    if (requiresGrade) {
-      const input = q.trim().toLowerCase().split(/\s+/);
-      const gradeIndex = input.findIndex((w) => w === "grade");
-      if (gradeIndex === -1 || !input[gradeIndex + 1]) return reply("❌ Grade missing. Use format like `.textbook grade 11`");
-      const grade = input[gradeIndex + 1];
-      categorySlug = `${slug}/grade-${grade}`;
-      gradeTerm = `Grade ${grade}`;
+    if (requiresGrade && (!q || !/grade\s+\d+/i.test(q))) {
+      return reply(`❌ Example: .${pattern} grade 11`)
     }
 
-    const items = await fetchGovdocItems(categorySlug);
-    if (!items.length) return reply(`❌ No ${label.toLowerCase()} found${gradeTerm ? ` for ${gradeTerm}` : ""}.`);
+    let categorySlug = slug
+    let gradeTerm = ""
+    if (requiresGrade) {
+      const input = q.trim().toLowerCase().split(/\s+/)
+      const gradeIndex = input.findIndex((w) => w === "grade")
+      if (gradeIndex === -1 || !input[gradeIndex + 1]) {
+        return reply("❌ Grade missing. Use format like `.textbook grade 11`")
+      }
+      const grade = input[gradeIndex + 1]
+      categorySlug = `${slug}/grade-${grade}`
+      gradeTerm = `Grade ${grade}`
+    }
 
-    const numberEmojis = ["0️⃣","1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣"];
+    const items = await fetchGovdocItems(categorySlug)
+    if (!items.length) {
+      return reply(`❌ No ${label.toLowerCase()} found${gradeTerm ? ` for ${gradeTerm}` : ""}.`)
+    }
 
-    let msg = `╔═━━━━━━━◥◣◆◢◤━━━━━━━━═╗  \n║     🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁    ║\n╚═━━━━━━━◢◤◆◥◣━━━━━━━━═╝\n    📂 𝗗𝗢𝗖𝗨𝗠𝗘𝗡𝗧 𝗟𝗜𝗕𝗥𝗔𝗥𝗬 📂\n┏━━━━━━━━━━━━━━━━━━━━━━┓\n┃ 🔰 𝗖𝗛𝗢𝗢𝗦𝗘 𝗗𝗢𝗖𝗨𝗠𝗘𝗡𝗧 𝗡𝗢.\n┃ 💬 𝗥𝗘𝗣𝗟𝗬 𝗧𝗢 𝗡𝗨𝗠𝗕𝗘𝗥❕\n┗━━━━━━━━━━━━━━━━━━━━━━┛\n┃ ⚙️ *Category:* ${label}\n┃ 🔎 *Grade:* ${gradeTerm || "N/A"}\n┃ 📊 *Results:* ${items.length}\n╰─🔥 𝘿𝘼𝙉𝙐𝙆𝘼 𝘿𝙄𝙎𝘼𝙉𝘼𝙔𝘼𝙆𝘼 🔥─╯\n─────────────────────────\n\n`;
+    const numberEmojis = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
+
+    let msg = `╔═━━━━━━━◥◣◆◢◤━━━━━━━━═╗
+║     🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁    ║
+╚═━━━━━━━◢◤◆◥◣━━━━━━━━═╝
+    📂 ${heading.toUpperCase()} 📂
+┏━━━━━━━━━━━━━━━━━━━━━━┓
+┃ 🔰 𝗖𝗛𝗢𝗢𝗦𝗘 𝗗𝗢𝗖𝗨𝗠𝗘𝗡𝗧 𝗡𝗢.
+┃ 💬 𝗥𝗘𝗣𝗟𝗬 𝗧𝗢 𝗡𝗨𝗠𝗕𝗘𝗥❕
+┗━━━━━━━━━━━━━━━━━━━━━━┛
+┃ ⚙️ *CATEGORY:* *${label.toUpperCase()}*
+┃ 🔎 *GRADE:* *${gradeTerm || "N/A"}*
+┃ 📊 *RESULTS:* *${items.length}*
+╰─🔥 𝘿𝘼𝙉𝙐𝙆𝘼 𝘿𝙄𝙎𝘼𝙉𝘼𝙔𝘼𝙆𝘼 🔥─╯
+─────────────────────────
+
+`
 
     items.forEach((item, i) => {
-      const emojiIndex = (i + 1).toString().split("").map(n => numberEmojis[n]).join("");
-      msg += `${emojiIndex} *${item.title}*\n\n`;
-    });
+      const emojiIndex = (i + 1).toString().split("").map(n => numberEmojis[n]).join("")
+      msg += `${emojiIndex} *${item.title}*\n\n`
+    })
 
-    msg += `📰 *Newsletter:* ${channelName}\n🔗 Invite: ${channelInvite}\n─────────────────────────\n💡 Reply with number to download.`;
+    msg += `💡 *Reply with a number to download.*`
 
     const sentMsg = await robin.sendMessage(from, {
       caption: msg,
       image: { url: LOGO_IMAGE },
       contextInfo: {
         forwardingScore: 999,
-        isForwarded: true,
-        forwardedNewsletterMessageInfo: {
-          newsletterJid: channelJid,
-          newsletterName: channelName,
-          serverMessageId: -1,
-        },
-      },
-    }, { quoted: mek });
-
-    await robin.sendMessage(from, { react: { text: "✅", key: sentMsg.key } });
-
-    pendingDownloads[sender] = { step: "select", results: items, quoted: mek, label, requiresGrade, heading, gradeTerm, reactionEmoji };
-  });
-
-  cmd({ filter: (text, { sender }) => pendingDownloads[sender] && pendingDownloads[sender].step === "select" && /^\d+$/.test(text.trim()) }, async (robin, mek, m, { from, body, sender, reply }) => {
-    const pending = pendingDownloads[sender];
-    const selected = parseInt(body.trim());
-    if (selected < 1 || selected > pending.results.length) return reply("❌ Invalid selection.");
-
-    const selectedItem = pending.results[selected - 1];
-    const { data } = await axios.get(selectedItem.link, { headers });
-    const $ = cheerio.load(data);
-
-    const languages = [];
-    $("a[href*='/view?id=']").each((_, el) => {
-      const href = $(el).attr("href");
-      const lang = $(el).find("button").text().trim() || "Document";
-      if (href) {
-        languages.push({ lang, link: href.startsWith("http") ? href : `https://govdoc.lk${href}` });
+        isForwarded: true
       }
-    });
+    }, { quoted: mek })
 
-    if (!languages.length) return reply("⚠️ No language versions found.");
+    await robin.sendMessage(from, { react: { text: "✅", key: sentMsg.key } })
 
-    let langMsg = `🌐 Available Languages for: _${selectedItem.title}_\n\n`;
-    languages.forEach((l, i) => { langMsg += `*${i + 1}.* ${l.lang}\n\n`; });
-    langMsg += `Reply with the number (1-${languages.length}) to download.`;
+    pendingDownloads[sender] = {
+      step: "select",
+      results: items,
+      quoted: mek,
+      label,
+      requiresGrade,
+      heading,
+      gradeTerm,
+      reactionEmoji
+    }
+  })
 
-    await robin.sendMessage(from, { text: langMsg }, { quoted: mek });
-    await robin.sendMessage(from, { react: { text: "❤️", key: mek.key } });
+  cmd({
+    filter: (text, { sender }) => pendingDownloads[sender] && pendingDownloads[sender].step === "select" && /^\d+$/.test(text.trim())
+  }, async (robin, mek, m, { from, body, sender, reply }) => {
+    const pending = pendingDownloads[sender]
+    const selected = parseInt(body.trim())
+    if (selected < 1 || selected > pending.results.length) {
+      return reply("❌ Invalid selection.")
+    }
 
-    pendingDownloads[sender] = { step: "download", selected: selectedItem, languages, quoted: mek, label: pending.label, requiresGrade: pending.requiresGrade, heading: pending.heading, gradeTerm: pending.gradeTerm, reactionEmoji: pending.reactionEmoji };
-  });
+    const selectedItem = pending.results[selected - 1]
+    const { data } = await axios.get(selectedItem.link, { headers })
+    const $ = cheerio.load(data)
 
-  cmd({ filter: (text, { sender }) => pendingDownloads[sender] && pendingDownloads[sender].step === "download" && /^\d+$/.test(text.trim()) }, async (robin, mek, m, { from, body, sender, reply }) => {
-    const pending = pendingDownloads[sender];
-    const selected = parseInt(body.trim());
-    if (selected < 1 || selected > pending.languages.length) return reply("❌ Invalid selection.");
+    const languages = []
+    $("a[href*='/view?id=']").each((_, el) => {
+      const href = $(el).attr("href")
+      const lang = $(el).find("button").text().trim() || "Document"
+      if (href) {
+        languages.push({
+          lang,
+          link: href.startsWith("http") ? href : `https://govdoc.lk${href}`
+        })
+      }
+    })
 
-    const lang = pending.languages[selected - 1];
-    const downloadDir = path.join(os.tmpdir(), `govdoc-${Date.now()}`);
+    if (!languages.length) return reply("⚠️ No language versions found.")
+
+    let langMsg = `🌐 *AVAILABLE LANGUAGES FOR:* *${selectedItem.title}*\n\n`
+    languages.forEach((l, i) => {
+      langMsg += `*${i + 1}.* ${l.lang}\n`
+    })
+    langMsg += `\n💬 *Reply with a number (1-${languages.length}) to download.*`
+
+    await robin.sendMessage(from, { text: langMsg }, { quoted: mek })
+    await robin.sendMessage(from, { react: { text: "✅", key: mek.key } })
+
+    pendingDownloads[sender] = {
+      step: "download",
+      selected: selectedItem,
+      languages,
+      quoted: mek,
+      label: pending.label,
+      requiresGrade: pending.requiresGrade,
+      heading: pending.heading,
+      gradeTerm: pending.gradeTerm,
+      reactionEmoji: pending.reactionEmoji
+    }
+  })
+
+  cmd({
+    filter: (text, { sender }) => pendingDownloads[sender] && pendingDownloads[sender].step === "download" && /^\d+$/.test(text.trim())
+  }, async (robin, mek, m, { from, body, sender, reply }) => {
+    const pending = pendingDownloads[sender]
+    const selected = parseInt(body.trim())
+    if (selected < 1 || selected > pending.languages.length) {
+      return reply("❌ Invalid selection.")
+    }
+
+    const lang = pending.languages[selected - 1]
+    const downloadDir = path.join(os.tmpdir(), `govdoc-${Date.now()}`)
 
     try {
-      fs.mkdirSync(downloadDir);
-      const browser = await puppeteer.launch({ headless: "new", args: ["--no-sandbox", "--disable-setuid-sandbox"] });
-      const page = await browser.newPage();
-      await page._client().send("Page.setDownloadBehavior", { behavior: "allow", downloadPath: downloadDir });
-      await page.goto(lang.link, { waitUntil: "networkidle2", timeout: 30000 });
-      await page.waitForSelector('a.btn.w-100[href*="/download/"]', { timeout: 15000 });
-      await page.click('a.btn.w-100[href*="/download/"]');
+      fs.mkdirSync(downloadDir)
+      const browser = await puppeteer.launch({
+        headless: "new",
+        args: ["--no-sandbox", "--disable-setuid-sandbox"]
+      })
+      const page = await browser.newPage()
+      await page._client().send("Page.setDownloadBehavior", {
+        behavior: "allow",
+        downloadPath: downloadDir
+      })
+      await page.goto(lang.link, {
+        waitUntil: "networkidle2",
+        timeout: 30000
+      })
+      await page.waitForSelector('a.btn.w-100[href*="/download/"]', {
+        timeout: 15000
+      })
+      await page.click('a.btn.w-100[href*="/download/"]')
 
-      let fileName;
+      let fileName
       for (let i = 0; i < 20; i++) {
-        const files = fs.readdirSync(downloadDir).filter((f) => f.endsWith(".pdf"));
-        if (files.length > 0) { fileName = files[0]; break; }
-        await new Promise((res) => setTimeout(res, 1000));
+        const files = fs.readdirSync(downloadDir).filter((f) => f.endsWith(".pdf"))
+        if (files.length > 0) {
+          fileName = files[0]
+          break
+        }
+        await new Promise((res) => setTimeout(res, 1000))
       }
-      await browser.close();
-      if (!fileName) throw new Error("Download did not complete in time.");
 
-      const filePath = path.join(downloadDir, fileName);
-      const pdfBuffer = fs.readFileSync(filePath);
-      const niceName = `${pending.selected.title} - ${lang.lang}.pdf`;
+      await browser.close()
+      if (!fileName) throw new Error("Download did not complete in time.")
+
+      const filePath = path.join(downloadDir, fileName)
+      const pdfBuffer = fs.readFileSync(filePath)
+      const niceName = `${pending.selected.title} - ${lang.lang}.pdf`
 
       await robin.sendMessage(from, {
         document: pdfBuffer,
         mimetype: "application/pdf",
         fileName: niceName,
-        caption: `╭━[ *✅ DOWNLOAD COMPLETE ✅* ]━⬣\n┃ 📄 ${niceName}\n┃ ⚙️ Made with ❤️ by DANUKA\n╰─🔥 DANUWA-MD 🔥─╯`,
-      }, { quoted: mek });
+        caption: `╭━[ *✅ DOWNLOAD COMPLETE ✅* ]━⬣
+┃ 📄 ${niceName}
+┃ ⚙️ Made with ❤️ by DANUKA
+╰─🔥 DANUWA-MD 🔥─╯`
+      }, { quoted: mek })
 
-      await robin.sendMessage(from, { react: { text: "⬇️", key: mek.key } });
+      await robin.sendMessage(from, { react: { text: "⬇️", key: mek.key } })
 
-      fs.unlinkSync(filePath);
-      fs.rmdirSync(downloadDir);
-      delete pendingDownloads[sender];
+      fs.unlinkSync(filePath)
+      fs.rmdirSync(downloadDir)
+      delete pendingDownloads[sender]
     } catch (e) {
-      console.error(e);
-      reply("⚠️ Failed to download PDF.");
-      delete pendingDownloads[sender];
+      console.error(e)
+      reply("⚠️ Failed to download PDF.")
+      delete pendingDownloads[sender]
     }
-  });
+  })
 }
 
-setupGovdocCommand({ pattern: "textbook", slug: "text-books", label: "Textbooks", requiresGrade: true, heading: "Textbook Library", reactionEmoji: "📚" });
-setupGovdocCommand({ pattern: "tguide", slug: "teacher-guides", label: "Teacher Guides", requiresGrade: true, heading: "Teacher Guide Library", reactionEmoji: "🧑‍🏫" });
-setupGovdocCommand({ pattern: "syllabus", slug: "syllabus", label: "Syllabus", requiresGrade: true, heading: "Syllabus Library", reactionEmoji: "📜" });
-setupGovdocCommand({ pattern: "gazette", slug: "gazette", label: "Gazette", requiresGrade: false, heading: "Gazette Library", reactionEmoji: "📢" });
+setupGovdocCommand({ pattern: "textbook", slug: "text-books", label: "Textbooks", requiresGrade: true, heading: "Textbook Library", reactionEmoji: "📚" })
+setupGovdocCommand({ pattern: "tguide", slug: "teacher-guides", label: "Teacher Guides", requiresGrade: true, heading: "Teacher Guide Library", reactionEmoji: "🧑‍🏫" })
+setupGovdocCommand({ pattern: "syllabus", slug: "syllabus", label: "Syllabus", requiresGrade: true, heading: "Syllabus Library", reactionEmoji: "📜" })
+setupGovdocCommand({ pattern: "gazette", slug: "gazette", label: "Gazette", requiresGrade: false, heading: "Gazette Library", reactionEmoji: "📢" })
