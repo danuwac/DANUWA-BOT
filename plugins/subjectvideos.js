@@ -4,7 +4,7 @@ const yts = require("yt-search");
 cmd(
   {
     pattern: "subjectvideos",
-    desc: "Get subject video playlist from DP Education (A/L or O/L)",
+    desc: "Get subject video playlist from DP Education (A/L or O/L) with preview",
     category: "education",
     react: "📚",
     filename: __filename,
@@ -37,12 +37,23 @@ cmd(
         return reply(`❌ No ${exam.toUpperCase()} playlist found for *${subject}*.`);
       }
 
-      const msg = `╭━〔 *📚 ${exam.toUpperCase()} SUBJECT VIDEO PLAYLIST* 〕━⬣
+      let msg = `╭━〔 *📚 ${exam.toUpperCase()} SUBJECT VIDEO PLAYLIST* 〕━⬣
 ┃ 🔖 *Subject:* *${subject.toUpperCase()}*
 ┃ 🎬 *Title:* ${playlist.title}
-┃ 🔗 *Link:* ${playlist.url}
 ┃ 📊 *Videos:* ${playlist.videoCount}
-╰──────────────⬣`;
+┃ 🔗 *Playlist:* ${playlist.url}
+╰──────────────⬣
+
+`;
+
+      // Show preview of first 3 videos (if available)
+      const preview = playlist.videos.slice(0, 3);
+      if (preview.length) {
+        msg += `📺 *Top Videos Preview:*\n`;
+        preview.forEach((v, i) => {
+          msg += `\n*${i + 1}.* ${v.title}\n⏱ ${v.timestamp} | 🔗 ${v.url}\n`;
+        });
+      }
 
       await robin.sendMessage(
         from,
@@ -51,7 +62,7 @@ cmd(
           contextInfo: {
             externalAdReply: {
               title: `DP Education - ${exam.toUpperCase()} Playlist`,
-              body: `${playlist.title}`,
+              body: playlist.title,
               thumbnailUrl: playlist.image,
               mediaType: 1,
               renderLargerThumbnail: true,
@@ -64,7 +75,7 @@ cmd(
       );
     } catch (e) {
       console.error("❌ Playlist search failed:", e);
-      reply("⚠️ Failed to fetch playlist. Please try again later.");
+      reply("⚠️ Failed to fetch playlist or preview.");
     }
   }
 );
