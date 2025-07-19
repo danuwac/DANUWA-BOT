@@ -55,17 +55,35 @@ cmd({
   const subjectSlug = subjectAliases[rawInput] || rawInput.replace(/\s+/g, "-");
   const posts = await fetchSubjectPapers(subjectSlug);
   if (!posts.length) return reply(`\u274c No past papers found for *${q}*`);
+  const numberEmojis = ["0️⃣","1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣"];
 
-  let msg = `╔═━━━━━━━━━━━━━━╗\n`;
-  msg += `║     🍁 ＤＡＮＵＷＡ－ －ＭＤ 🍁     ║\n`;
-  msg += `╚═━━━━━━━━━━━━━━╝\n`;
-  msg += `     *📄 A/L PAST PAPERS 📄*\n`;
-  msg += `\n*SUBJECT:* *${rawInput.toUpperCase()}*\n*RESULTS:* *${posts.length}*\n\n`;
-  msg += `🔹 *REPLY WITH A NUMBER TO SELECT A PAPER:*\n\n`;
+  let msg = `╔═━━━━━━━◥◣◆◢◤━━━━━━━━═╗
+║     🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁    ║
+╚═━━━━━━━◢◤◆◥◣━━━━━━━━═╝
+         *📄 A/L PAST PAPERS 📄*
+┏━━━━━━━━━━━━━━━━━━━━━━┓
+┃ 🔰 𝗖𝗛𝗢𝗢𝗦𝗘 𝗣𝗔𝗣𝗘𝗥 𝗡𝗢.
+┃ 💬 𝗥𝗘𝗣𝗟𝗬 𝗧𝗢 𝗡𝗨𝗠𝗕𝗘𝗥❕
+┗━━━━━━━━━━━━━━━━━━━━━━┛
+┃ 📚 *SUBJECT:* *${rawInput.toUpperCase()}*
+┃ 📊 *RESULTS:* *${posts.length}*
+╰─🔥 𝘿𝘼𝙉𝙐𝙆𝘼 𝘿𝙄𝙎𝘼𝙉𝘼𝙔𝘼𝙆𝘼 🔥─╯
+
+`;
   posts.forEach((post, i) => {
-    msg += `*${i + 1}.* ${post.title}\n`;
+    const emojiIndex = (i + 1).toString().split("").map(n => numberEmojis[n]).join("");
+    msg += `${emojiIndex} *${post.title}*
+    
+`;
   });
 
+  msg += `─────────────────────────
+💡 *Reply with a number to download.*`;
+  pendingALPapers[sender] = {
+    step: "select",
+    results: posts,
+    quoted: mek,
+  };
   await robin.sendMessage(from, {
     caption: msg,
     image: { url: LOGO_IMAGE },
@@ -117,12 +135,14 @@ cmd({
       return reply("\u26a0\ufe0f No language options found for this paper.");
     }
 
-    let langMsg = `🌐 *Available Languages for:* _${selectedResult.title}_\n\n`;
+    let langMsg = `🌐 *Available Languages for:* *${selectedResult.title}*
+    
+`;
     languages.forEach((l, i) => {
       langMsg += `*${i + 1}.* ${l.lang}\n`;
     });
-    langMsg += `\n_Reply with a number (1-${languages.length}) to download._`;
-
+    langMsg += `
+💬 *Reply with a number (1-${languages.length}) to download.*`;
     pendingALPapers[sender] = {
       step: "download",
       selected: selectedResult,
@@ -184,16 +204,23 @@ cmd({
     const pdfBuffer = fs.readFileSync(filePath);
     const niceName = `${pending.selected.title} - ${lang.lang}.pdf`;
 
-    await robin.sendMessage(
+    const sentMsg2 = await robin.sendMessage(
       from,
       {
         document: pdfBuffer,
         mimetype: "application/pdf",
         fileName: niceName,
-        caption: `\u2551 *\u2705 DOWNLOAD COMPLETE \u2705*\n\n\u2022 ${niceName}\n\u2022 Made with ❤️ by \n\u2728 DANUKA DISANAYAKA ✨`,
+        caption: `╭[ *✅ DOWNLOAD COMPLETE ✅* ]━⬣
+┃ 📄 ${niceName}
+┃ ⚙️ Made with ❤️ by
+╰🔥 𝘿𝘼𝙉𝙐𝙆𝘼 𝘿𝙄𝙎𝘼𝙉𝘼𝙔𝘼𝙆𝘼 🔥`,
       },
       { quoted: mek }
     );
+
+    await robin.sendMessage(from, {
+      react: { text: "✅", key: sentMsg2.key },
+    });
 
     fs.unlinkSync(filePath);
     fs.rmdirSync(downloadDir);
