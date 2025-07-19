@@ -3,7 +3,7 @@ const yts = require("yt-search");
 const axios = require("axios");
 
 const channelJid = "120363418166326365@newsletter";
-const channelName = "🍁 ＤＡＮＵＷＡ－ －ＭＤ 🍁";
+const channelName = "🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁";
 const channelInvite = '0029Vb65OhH7oQhap1fG1y3o';
 cmd(
   {
