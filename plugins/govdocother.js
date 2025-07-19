@@ -240,7 +240,7 @@ function setupGovdocCommand({ pattern, slug, label, requiresGrade, heading, reac
       const pdfBuffer = fs.readFileSync(filePath);
       const niceName = `${pending.selected.title} - ${lang.lang}.pdf`;
 
-      await danuwa.sendMessage(from, {
+      const sentMsg2 = await danuwa.sendMessage(from, {
         document: pdfBuffer,
         mimetype: "application/pdf",
         fileName: niceName,
@@ -254,7 +254,7 @@ function setupGovdocCommand({ pattern, slug, label, requiresGrade, heading, reac
         {
           react: {
             text: "✅",
-            key: m.key,
+            key: sentMsg2.key,
           },
         }
       );
