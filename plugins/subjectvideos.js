@@ -4,7 +4,7 @@ const ytpl = require("ytpl");
 
 cmd(
   {
-    pattern: "subjectvideos",
+    pattern: "subjectvideos ?(.*)",
     desc: "Get subject video playlist from DP Education (A/L or O/L) with preview",
     category: "education",
     react: "📚",
@@ -34,12 +34,11 @@ cmd(
       const result = await yts(searchTerm);
       const found = result.playlists?.[0];
 
-      if (!found) return reply(`❌ No playlist found for *${subject}*.`);
+      if (!found || typeof found.url !== "string" || !found.url.length) {
+        return reply(`❌ No playlist found for *${subject}*.`);
+      }
 
-      // Extract valid playlist ID
       const playlistId = ytpl.getPlaylistID(found.url);
-
-      // Fetch full playlist info
       const playlist = await ytpl(playlistId, { limit: 5 });
 
       let msg = `╭━〔 *📚 ${exam.toUpperCase()} SUBJECT VIDEO PLAYLIST* 〕━⬣
