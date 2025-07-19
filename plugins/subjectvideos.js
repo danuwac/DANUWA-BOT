@@ -1,6 +1,6 @@
 const { cmd } = require("../command");
 const yts = require("yt-search");
-const youtubePlaylist = require("youtube-playlist").default;
+const youtubePlaylist = require("youtube-playlist");
 
 cmd(
   {
