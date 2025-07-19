@@ -38,7 +38,9 @@ cmd(
       if (!playlist) {
         return reply(`❌ No ${exam.toUpperCase()} playlist found for *${subject}*.`);
       }
-
+      const thumbBuffer = await axios.get(playlist.image, {
+        responseType: "arraybuffer",
+      });
       const msg = `╔═━━━━━━━◥◣◆◢◤━━━━━━━━═╗
 ║     🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁    ║
 ╚═━━━━━━━◢◤◆◥◣━━━━━━━━═╝
@@ -55,7 +57,8 @@ cmd(
       await robin.sendMessage(
         from,
         {
-          text: msg,
+          image: thumbBuffer.data,
+          caption: msg,
           contextInfo: {
             forwardingScore: 999,
             isForwarded: true,
