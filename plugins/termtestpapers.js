@@ -189,7 +189,7 @@ cmd({
   filter: (text, { sender }) =>
     pendingGovDoc[sender] && pendingGovDoc[sender].step === "download" && /^\d+$/.test(text.trim()),
 }, async (robin, mek, m, { from, body, sender, reply }) => 
-  await robin.sendMessage(from, { react: { text: "⬇️", key: m.key } });
+  await robin.sendMessage(from, { react: { text: "⬇️", key: m.key } }));
   const pending = pendingGovDoc[sender];
   const selected = parseInt(body.trim());
   if (selected < 1 || selected > pending.languages.length) {
