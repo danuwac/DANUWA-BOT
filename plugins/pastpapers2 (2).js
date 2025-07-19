@@ -11,7 +11,7 @@ const headers = {
   "Accept-Language": "en-US,en;q=0.9",
 };
 
-// Subject aliases for user convenience (short → real subject names)
+// Subject aliases for user convenience
 const subjectAliases = {
   commerce: "business accounting studies",
   ict: "information communication technology",
@@ -35,7 +35,24 @@ const subjectAliases = {
 
 const pendingGovDoc = {};
 
-// Fetch all posts from grade page, filter by subject substring
+// Helper function: checks if all words in subjectAlias appear in title (flexible match)
+function subjectMatch(title, subjectAlias) {
+  const clean = (str) =>
+    str
+      .toLowerCase()
+      .replace(/[&.,\-]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const cleanTitle = clean(title);
+  const cleanSubject = clean(subjectAlias);
+
+  return cleanSubject
+    .split(" ")
+    .every((word) => word && cleanTitle.includes(word));
+}
+
+// Fetch posts from grade page, filter by subject inside <h5.cate-title>
 async function fetchGovdocPosts(grade, subject) {
   const baseUrl = `https://govdoc.lk/category/term-test-papers/grade-${grade}/`;
   const posts = [];
@@ -53,14 +70,14 @@ async function fetchGovdocPosts(grade, subject) {
       let newPostsCount = 0;
 
       cards.each((_, el) => {
-        const link = $(el).attr("href");
         const title = $(el).find("h5.cate-title").text().trim();
+        const link = $(el).attr("href");
 
         if (
           link &&
           title &&
-          title.toLowerCase().includes(subject.toLowerCase()) &&
-          !posts.find(p => p.link === link)
+          subjectMatch(title, subject) &&
+          !posts.find((p) => p.link === link)
         ) {
           posts.push({ title, link });
           newPostsCount++;
@@ -79,7 +96,7 @@ async function fetchGovdocPosts(grade, subject) {
   return posts;
 }
 
-// Download PDF via Puppeteer, returns filepath or null
+// Download PDF with Puppeteer, returns filepath or null
 async function downloadPDF(url) {
   const downloadDir = path.join(os.tmpdir(), `govdoc-${Date.now()}`);
   fs.mkdirSync(downloadDir);
@@ -100,12 +117,12 @@ async function downloadPDF(url) {
 
   let fileName;
   for (let i = 0; i < 20; i++) {
-    const files = fs.readdirSync(downloadDir).filter(f => f.endsWith(".pdf"));
+    const files = fs.readdirSync(downloadDir).filter((f) => f.endsWith(".pdf"));
     if (files.length > 0) {
       fileName = files[0];
       break;
     }
-    await new Promise(res => setTimeout(res, 1000));
+    await new Promise((res) => setTimeout(res, 1000));
   }
 
   await browser.close();
@@ -118,7 +135,7 @@ async function downloadPDF(url) {
   return path.join(downloadDir, fileName);
 }
 
-// Step 1: Command - User inputs grade + subject
+// Step 1: Command to list papers by grade + subject
 cmd(
   {
     pattern: "govdoc",
@@ -153,7 +170,8 @@ cmd(
     reply(`🔍 Searching Grade ${grade} papers for subject: *${subject}* ...`);
 
     const posts = await fetchGovdocPosts(grade, subject);
-    if (posts.length === 0) return reply(`❌ No papers found for *${subject}* in grade ${grade}.`);
+    if (posts.length === 0)
+      return reply(`❌ No papers found for *${subject}* in grade ${grade}.`);
 
     let msg = `📚 *GovDoc Grade ${grade} - ${subject.toUpperCase()} Term Test Papers*\n────────────────────\n_Reply with paper number to download_\n\n`;
 
@@ -173,7 +191,7 @@ cmd(
   }
 );
 
-// Step 2: User selects paper number
+// Step 2: User replies with number to download
 cmd(
   {
     filter: (text, { sender }) =>
