@@ -99,7 +99,7 @@ cmd({
   let msg = `╔═━━━━━━━◥◣◆◢◤━━━━━━━━═╗
 ║     🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁    ║
 ╚═━━━━━━━◢◤◆◥◣━━━━━━━━═╝
-    📂 TERM TEST PAPERS 📂
+      *📂 TERM TEST PAPERS 📂*
 ┏━━━━━━━━━━━━━━━━━━━━━━┓
 ┃ 🔰 𝗖𝗛𝗢𝗢𝗦𝗘 𝗣𝗔𝗣𝗘𝗥 𝗡𝗢.
 ┃ 💬 𝗥𝗘𝗣𝗟𝗬 𝗧𝗢 𝗡𝗨𝗠𝗕𝗘𝗥❕
@@ -109,7 +109,7 @@ cmd({
 ┃ 📊 *RESULTS:* *${posts.length}*
 ╰─🔥 𝘿𝘼𝙉𝙐𝙆𝘼 𝘿𝙄𝙎𝘼𝙉𝘼𝙔𝘼𝙆𝘼 🔥─╯\n\n`;
 
-  items.forEach((item, i) => {
+  posts.forEach((item, i) => {
     const emojiIndex = (i + 1).toString().split("").map(n => numberEmojis[n]).join("");
     msg += `${emojiIndex} *${item.title}*\n\n`;
   });
