@@ -133,7 +133,7 @@ cmd(
     const numberEmojis = ["0️⃣","1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣"];
 
     // Capitalize type for title
-    const typeText = type.toUpperCase() === "O/L" ? "O/L Model Papers" : "A/L Model Papers";
+    const typeText = (type.toUpperCase() === "O/L" ? "O/L Model Papers" : "A/L Model Papers").toUpperCase();
 
     let msg = `╔═━━━━━━━◥◣◆◢◤━━━━━━━━═╗
 ║     🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁    ║
