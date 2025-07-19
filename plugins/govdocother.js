@@ -12,7 +12,7 @@ const headers = {
 };
 
 const pendingDownloads = {};
-const LOGO_IMAGE = "https://github.com/danuwac/DANUWA-BOT/blob/main/images/Alive.png?raw=true"; // Replace this with your actual logo URL
+const LOGO_IMAGE = "https://i.imgur.com/YOUR_LOGO.png"; // replace with your DANUWA-MD logo
 
 async function fetchGovdocItems(categorySlug) {
   const items = [];
@@ -81,12 +81,21 @@ function setupGovdocCommand({ pattern, slug, label, requiresGrade }) {
       return reply(`❌ No ${label.toLowerCase()} found${requiresGrade ? ` for grade ${categorySlug.split("/")[1].replace("grade-", "")}` : ""}.`);
     }
 
-    const title = `📚 *DANUWA-MD: ${label} Center*${requiresGrade ? `\n🎓 Grade: *${categorySlug.split("/")[1].replace("grade-", "")}*` : ""}`;
-    let msg = `${title}\n────────────────────\n📎 *Please reply with the number to select an item:*\n\n`;
+    const grade = requiresGrade ? categorySlug.split("/")[1].replace("grade-", "") : "";
+    let msg = `╭─────── ⭓  GOVDOC CENTER  ⭓ ───────╮
+│ 📚 CATEGORY: ${label}
+${grade ? `│ 🎓 GRADE: ${grade}` : ""}
+│ 📎 TYPE: Select an item by replying
+╰──────────────────────⟡\n\n`;
+
     items.forEach((item, i) => {
-      msg += `*${i + 1}.* ${item.title}\n`;
+      msg += `🔹 *${i + 1}.* ${item.title}\n\n`;
     });
-    msg += `\n🤖 _Powered by DANUWA-MD Bot_`;
+
+    msg += `╭────── ⭓ DANUWA-MD BOT ⭓ ──────╮
+│ 🤖 Powered by DANUWA-MD
+│ 📅 Source: govdoc.lk
+╰──────────────────────────────╯`;
 
     await robin.sendMessage(
       from,
@@ -106,7 +115,6 @@ function setupGovdocCommand({ pattern, slug, label, requiresGrade }) {
     };
   });
 
-  // Step 2 - Language selection
   cmd({
     filter: (text, { sender }) =>
       pendingDownloads[sender] &&
@@ -117,7 +125,7 @@ function setupGovdocCommand({ pattern, slug, label, requiresGrade }) {
     const selected = parseInt(body.trim());
 
     if (selected < 1 || selected > pending.results.length)
-      return reply("⚠️ *Invalid selection.*\nReply with a number from the list.");
+      return reply("⚠️ Invalid selection.\nReply with a number from the list.");
 
     const selectedItem = pending.results[selected - 1];
 
@@ -154,11 +162,16 @@ function setupGovdocCommand({ pattern, slug, label, requiresGrade }) {
         return reply("⚠️ No language versions found.");
       }
 
-      let langMsg = `🌐 *Language Options for:* _${selectedItem.title}_\n────────────────────\n`;
+      let langMsg = `╭─────── ⭓ LANGUAGE OPTIONS ⭓ ───────╮
+│ 📄 DOCUMENT: ${selectedItem.title}
+│ 🌐 Select a language to download
+╰────────────────────────⟡\n\n`;
+
       languages.forEach((l, i) => {
-        langMsg += `🔹 *${i + 1}.* ${l.lang}\n`;
+        langMsg += `🔹 *${i + 1}.* ${l.lang}\n\n`;
       });
-      langMsg += `\n✏️ _Reply with a number (1-${languages.length}) to start the download._`;
+
+      langMsg += `✏️ Reply with the number of the language`;
 
       pendingDownloads[sender] = {
         step: "download",
@@ -177,7 +190,6 @@ function setupGovdocCommand({ pattern, slug, label, requiresGrade }) {
     }
   });
 
-  // Step 3 - Download via Puppeteer
   cmd({
     filter: (text, { sender }) =>
       pendingDownloads[sender] &&
@@ -188,7 +200,7 @@ function setupGovdocCommand({ pattern, slug, label, requiresGrade }) {
     const selected = parseInt(body.trim());
 
     if (selected < 1 || selected > pending.languages.length)
-      return reply("⚠️ *Invalid selection.*\nPlease choose a valid language number.");
+      return reply("⚠️ Invalid language selection.\nPlease reply with a valid number.");
 
     const lang = pending.languages[selected - 1];
     const downloadDir = path.join(os.tmpdir(), `govdoc-${Date.now()}`);
@@ -249,28 +261,8 @@ function setupGovdocCommand({ pattern, slug, label, requiresGrade }) {
   });
 }
 
-// Register commands
-setupGovdocCommand({
-  pattern: "textbook",
-  slug: "text-books",
-  label: "Textbooks",
-  requiresGrade: true,
-});
-setupGovdocCommand({
-  pattern: "tguide",
-  slug: "teacher-guides",
-  label: "Teacher Guides",
-  requiresGrade: true,
-});
-setupGovdocCommand({
-  pattern: "syllabus",
-  slug: "syllabus",
-  label: "Syllabus",
-  requiresGrade: true,
-});
-setupGovdocCommand({
-  pattern: "gazette",
-  slug: "gazette",
-  label: "Gazette",
-  requiresGrade: false,
-});
+// Register all commands
+setupGovdocCommand({ pattern: "textbook", slug: "text-books", label: "Textbooks", requiresGrade: true });
+setupGovdocCommand({ pattern: "tguide", slug: "teacher-guides", label: "Teacher Guides", requiresGrade: true });
+setupGovdocCommand({ pattern: "syllabus", slug: "syllabus", label: "Syllabus", requiresGrade: true });
+setupGovdocCommand({ pattern: "gazette", slug: "gazette", label: "Gazette", requiresGrade: false });
