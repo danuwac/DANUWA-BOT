@@ -1,6 +1,8 @@
 const { cmd } = require("../command");
 const yts = require("yt-search");
-
+const channelJid = "120363418166326365@newsletter";
+const channelName = "🍁 ＤＡＮＵＷＡ－ －ＭＤ 🍁";
+const channelInvite = '0029Vb65OhH7oQhap1fG1y3o';
 cmd(
   {
     pattern: "subjectvideos",
@@ -40,7 +42,7 @@ cmd(
       const msg = `╔═━━━━━━━◥◣◆◢◤━━━━━━━━═╗
 ║     🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁    ║
 ╚═━━━━━━━◢◤◆◥◣━━━━━━━━═╝
-*📺 SUBJECT VIDEO PLAYLIST 📺*
+  *❤️ SUBJECT VIDEO PLAYLIST ❤️*
 ┏━━━━━━━━━━━━━━━━━━━━━━┓
 ┃ 🔰 𝗘𝗫𝗔𝗠 𝗧𝗬𝗣𝗘: *${exam.toUpperCase()}*
 ┃ 📚 𝗦𝗨𝗕𝗝𝗘𝗖𝗧: *${subject.toUpperCase()}*
@@ -55,17 +57,16 @@ cmd(
         {
           text: msg,
           contextInfo: {
-            externalAdReply: {
-              title: `DP Education - ${exam.toUpperCase()} Playlist`,
-              body: playlist.title,
-              thumbnailUrl: playlist.image,
-              mediaType: 1,
-              renderLargerThumbnail: true,
-              showAdAttribution: true,
-              sourceUrl: playlist.url,
+            forwardingScore: 999,
+            isForwarded: true,
+            forwardedNewsletterMessageInfo: {
+              newsletterJid: channelJid,
+              newsletterName: channelName,
+              serverMessageId: -1,
             },
           },
         },
+        ),
         { quoted: mek }
       );
     } catch (e) {
