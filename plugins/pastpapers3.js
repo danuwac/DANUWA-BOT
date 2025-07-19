@@ -11,7 +11,36 @@ const headers = {
   "Accept-Language": "en-US,en;q=0.9",
 };
 
-const subjectAliases = {
+const LOGO_IMAGE = "https://github.com/DANUWA-MD/DANUWA-BOT/blob/main/images/educational__zone.png?raw=true";
+const channelJid = "120363418166326365@newsletter";
+const channelName = "🍁 ＤＡＮＵＷＡ－ －ＭＤ 🍁";
+const pendingALPapers = {};
+
+async function fetchSubjectPapers(subjectSlug) {
+  const url = `https://govdoc.lk/category/past-papers/gce-ordinary-level-exam/${subjectSlug}`;
+  const res = await axios.get(url, { headers });
+  const $ = cheerio.load(res.data);
+  const posts = [];
+  $("a.custom-card").each((_, el) => {
+    if ($(el).closest(".info-body").length > 0) return;
+    const link = $(el).attr("href");
+    const title = $(el).find("h5.cate-title").text().trim();
+    if (link && title) posts.push({ title, link });
+  });
+  return posts.slice(0, 20);
+}
+
+cmd({
+  pattern: "ol",
+  react: "📄",
+  desc: "Get O/L past papers by subject from govdoc.lk",
+  category: "education",
+  filename: __filename,
+}, async (robin, mek, m, { from, q, sender, reply }) => {
+  if (!q) return reply("\u274c Please provide a subject. Example: `.pastpapers biology`");
+  await m.react("\ud83d\udcc4");
+
+  const subjectAliases = {
   commerce: "business--accounting-studies",
   ict: "information-communication-technology-ict",
   hist: "history",
@@ -34,162 +63,185 @@ const subjectAliases = {
   maths: "mathematics",
 };
 
-const pendingPastPaper = {};
+  const rawInput = q.trim().toLowerCase();
+  const subjectSlug = subjectAliases[rawInput] || rawInput.replace(/\s+/g, "-");
+  const posts = await fetchSubjectPapers(subjectSlug);
+  if (!posts.length) return reply(`\u274c No past papers found for *${q}*`);
+  const numberEmojis = ["0️⃣","1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣"];
 
-async function fetchLanguageOptions(url) {
-  const res = await axios.get(url, { headers });
-  const $ = cheerio.load(res.data);
+  let msg = `╔═━━━━━━━◥◣◆◢◤━━━━━━━━═╗
+║     🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁    ║
+╚═━━━━━━━◢◤◆◥◣━━━━━━━━═╝
+         *📄 O/L PAST PAPERS 📄*
+┏━━━━━━━━━━━━━━━━━━━━━━┓
+┃ 🔰 𝗖𝗛𝗢𝗢𝗦𝗘 𝗣𝗔𝗣𝗘𝗥 𝗡𝗢.
+┃ 💬 𝗥𝗘𝗣𝗟𝗬 𝗧𝗢 𝗡𝗨𝗠𝗕𝗘𝗥❕
+┗━━━━━━━━━━━━━━━━━━━━━━┛
+┃ 📚 *SUBJECT:* *${rawInput.toUpperCase()}*
+┃ 📊 *RESULTS:* *${posts.length}*
+╰─🔥 𝘿𝘼𝙉𝙐𝙆𝘼 𝘿𝙄𝙎𝘼𝙉𝘼𝙔𝘼𝙆𝘼 🔥─╯
 
-  const title = $("h1.entry-title").text().trim();
-  const languages = [];
-
-  $("a[href*='/view?id=']").each((_, el) => {
-    const lang = $(el).find("button").text().trim();
-    const href = $(el).attr("href");
-    if (lang && href) {
-      languages.push({
-        lang,
-        link: href.startsWith("http") ? href : `https://govdoc.lk${href}`,
-      });
-    }
+`;
+  posts.forEach((post, i) => {
+    const emojiIndex = (i + 1).toString().split("").map(n => numberEmojis[n]).join("");
+    msg += `${emojiIndex} *${post.title}*
+    
+`;
   });
 
-  return { title, languages };
-}
+  msg += `─────────────────────────
+💡 *Reply with a number to download.*`;
+  pendingALPapers[sender] = {
+    step: "select",
+    results: posts,
+    quoted: mek,
+  };
+  await robin.sendMessage(from, {
+    caption: msg,
+    image: { url: LOGO_IMAGE },
+    contextInfo: {
+      forwardingScore: 999,
+      isForwarded: true,
+      forwardedNewsletterMessageInfo: {
+        newsletterJid: channelJid,
+        newsletterName: channelName,
+        serverMessageId: -1,
+      },
+    },
+  }, { quoted: mek });
 
-// Step 1: .pastpapers 2024 ict
-cmd(
-  {
-    pattern: "pastol",
-    desc: "Download O/L past papers by year and subject",
-    category: "education",
-    react: "📄",
-    filename: __filename,
-  },
-  async (robin, mek, m, { from, q, sender, reply }) => {
-    if (!q) return reply("❌ Usage: `.pastpapers <year> <subject>`");
+  pendingALPapers[sender] = {
+    step: "select",
+    results: posts,
+    quoted: mek,
+  };
+});
 
-    const parts = q.trim().toLowerCase().split(/\s+/);
-    if (parts.length < 2) return reply("❌ You must provide both year and subject.");
+cmd({
+  filter: (text, { sender }) =>
+    pendingALPapers[sender] && pendingALPapers[sender].step === "select" && /^\d+$/.test(text.trim()),
+}, async (robin, mek, m, { from, body, sender, reply }) => {
+  await robin.sendMessage(from, { react: { text: "⬇️", key: m.key } });
+  const pending = pendingALPapers[sender];
+  const selected = parseInt(body.trim());
+  if (selected < 1 || selected > pending.results.length) {
+    return reply("\u274c Invalid selection. Please reply with a valid number.");
+  }
 
-    const year = parts[0];
-    const rawSubject = parts.slice(1).join("-").replace(/\s+/g, "-");
-    const subjectSlug = subjectAliases[rawSubject] || rawSubject;
-
-    const urlsToTry = [
-      `https://govdoc.lk/gce-ordinary-level-exam-${year}-${subjectSlug}-past-papers`,
-      `https://govdoc.lk/gce-ordinary-level-exam-${year}-${parseInt(year) + 1}-${subjectSlug}-past-papers`,
-    ];
-
-    let pageData;
-    let finalUrl;
-
-    for (const url of urlsToTry) {
-      try {
-        pageData = await fetchLanguageOptions(url);
-        if (pageData.languages.length) {
-          finalUrl = url;
-          break;
-        }
-      } catch (e) {
-        // continue to try fallback
+  const selectedResult = pending.results[selected - 1];
+  try {
+    const { data } = await axios.get(selectedResult.link, { headers });
+    const $ = cheerio.load(data);
+    const languages = [];
+    $("a[href*='/view?id=']").each((_, el) => {
+      const lang = $(el).find("button").text().trim();
+      const href = $(el).attr("href");
+      if (lang && href) {
+        languages.push({
+          lang,
+          link: href.startsWith("http") ? href : `https://govdoc.lk${href}`,
+        });
       }
-    }
-
-    if (!pageData || !pageData.languages.length) {
-      return reply("❌ Past paper not found. Check the year or subject name.");
-    }
-
-    const msgLines = [`📄 *${pageData.title}*`, `\n🌐 *Available Languages:*`];
-    pageData.languages.forEach((l, i) => {
-      msgLines.push(`*${i + 1}.* ${l.lang}`);
     });
-    msgLines.push(`\n_Reply with a number to download that version._`);
+    if (!languages.length) {
+      delete pendingALPapers[sender];
+      return reply("\u26a0\ufe0f No language options found for this paper.");
+    }
 
-    pendingPastPaper[sender] = {
+    let langMsg = `🌐 *Available Languages for:* *${selectedResult.title}*
+    
+`;
+    languages.forEach((l, i) => {
+      langMsg += `*${i + 1}.* ${l.lang}\n`;
+    });
+    langMsg += `
+💬 *Reply with a number (1-${languages.length}) to download.*`;
+    pendingALPapers[sender] = {
       step: "download",
-      title: pageData.title,
-      languages: pageData.languages,
+      selected: selectedResult,
+      languages,
       quoted: mek,
     };
 
-    await robin.sendMessage(from, { text: msgLines.join("\n") }, { quoted: mek });
+    reply(langMsg);
+  } catch (e) {
+    console.error(e);
+    reply("\u26a0\ufe0f Failed to fetch language options. Please try again.");
+    delete pendingALPapers[sender];
   }
-);
+});
 
-// Step 2: user replies with number
-cmd(
-  {
-    filter: (text, { sender }) =>
-      pendingPastPaper[sender] &&
-      pendingPastPaper[sender].step === "download" &&
-      /^\d+$/.test(text.trim()),
-  },
-  async (robin, mek, m, { from, sender, body, reply }) => {
-    const pending = pendingPastPaper[sender];
-    const selected = parseInt(body.trim());
+cmd({
+  filter: (text, { sender }) =>
+    pendingALPapers[sender] && pendingALPapers[sender].step === "download" && /^\d+$/.test(text.trim()),
+}, async (robin, mek, m, { from, body, sender, reply }) => {
+  await robin.sendMessage(from, { react: { text: "⬇️", key: m.key } });
+  const pending = pendingALPapers[sender];
+  const selected = parseInt(body.trim());
+  if (selected < 1 || selected > pending.languages.length) {
+    return reply("\u274c Invalid selection. Please reply with a valid number.");
+  }
 
-    if (selected < 1 || selected > pending.languages.length) {
-      return reply("❌ Invalid selection.");
-    }
+  const lang = pending.languages[selected - 1];
+  const downloadDir = path.join(os.tmpdir(), `al-papers-${Date.now()}`);
 
-    const lang = pending.languages[selected - 1];
-    const downloadDir = path.join(os.tmpdir(), `olpaper-${Date.now()}`);
+  try {
+    fs.mkdirSync(downloadDir);
+    const browser = await puppeteer.launch({
+      headless: "new",
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+    const page = await browser.newPage();
+    await page._client().send("Page.setDownloadBehavior", {
+      behavior: "allow",
+      downloadPath: downloadDir,
+    });
 
-    try {
-      fs.mkdirSync(downloadDir);
+    await page.goto(lang.link, { waitUntil: "networkidle2", timeout: 30000 });
+    await page.waitForSelector('a.btn.w-100[href*="/download/"]', { timeout: 15000 });
+    await page.click('a.btn.w-100[href*="/download/"]');
 
-      const browser = await puppeteer.launch({
-        headless: "new",
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
-      });
-
-      const page = await browser.newPage();
-      await page._client().send("Page.setDownloadBehavior", {
-        behavior: "allow",
-        downloadPath: downloadDir,
-      });
-
-      await page.goto(lang.link, { waitUntil: "networkidle2", timeout: 30000 });
-      await page.waitForSelector('a.btn.w-100[href*="/download/"]', { timeout: 15000 });
-      await page.click('a.btn.w-100[href*="/download/"]');
-
-      // Wait for download
-      let fileName;
-      for (let i = 0; i < 20; i++) {
-        const files = fs.readdirSync(downloadDir).filter(f => f.endsWith(".pdf"));
-        if (files.length > 0) {
-          fileName = files[0];
-          break;
-        }
-        await new Promise(res => setTimeout(res, 1000));
+    let fileName;
+    for (let i = 0; i < 20; i++) {
+      const files = fs.readdirSync(downloadDir).filter(f => f.endsWith(".pdf"));
+      if (files.length > 0) {
+        fileName = files[0];
+        break;
       }
-
-      await browser.close();
-
-      if (!fileName) throw new Error("Download did not complete.");
-
-      const filePath = path.join(downloadDir, fileName);
-      const buffer = fs.readFileSync(filePath);
-      const niceName = `${pending.title} - ${lang.lang}.pdf`;
-
-      await robin.sendMessage(
-        from,
-        {
-          document: buffer,
-          mimetype: "application/pdf",
-          fileName: niceName,
-        },
-        { quoted: mek }
-      );
-
-      fs.unlinkSync(filePath);
-      fs.rmdirSync(downloadDir);
-      delete pendingPastPaper[sender];
-    } catch (e) {
-      console.error("❌ Puppeteer download failed:", e.message);
-      reply("⚠️ Failed to download PDF. It may have timed out.");
-      delete pendingPastPaper[sender];
+      await new Promise(res => setTimeout(res, 1000));
     }
+
+    await browser.close();
+    if (!fileName) throw new Error("Download did not start in time.");
+
+    const filePath = path.join(downloadDir, fileName);
+    const pdfBuffer = fs.readFileSync(filePath);
+    const niceName = `${pending.selected.title} - ${lang.lang}.pdf`;
+
+    const sentMsg2 = await robin.sendMessage(
+      from,
+      {
+        document: pdfBuffer,
+        mimetype: "application/pdf",
+        fileName: niceName,
+        caption: `╭[ *✅ DOWNLOAD COMPLETE ✅* ]━⬣
+┃ 📄 ${niceName}
+┃ ⚙️ Made with ❤️ by
+╰🔥 𝘿𝘼𝙉𝙐𝙆𝘼 𝘿𝙄𝙎𝘼𝙉𝘼𝙔𝘼𝙆𝘼 🔥`,
+      },
+      { quoted: mek }
+    );
+
+    await robin.sendMessage(from, {
+      react: { text: "✅", key: sentMsg2.key },
+    });
+
+    fs.unlinkSync(filePath);
+    fs.rmdirSync(downloadDir);
+    delete pendingALPapers[sender];
+  } catch (e) {
+    console.error("\u274c Puppeteer download failed:", e.message);
+    reply("\u26a0\ufe0f Failed to download PDF. It may have timed out or failed to start.");
+    delete pendingALPapers[sender];
   }
-);
+});
