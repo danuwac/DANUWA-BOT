@@ -38,7 +38,10 @@ cmd(
       }
 
       // Step 2: Scrape download link from y2mate using Puppeteer
-      const browser = await puppeteer.launch({ headless: "new" });
+      const browser = await puppeteer.launch({
+        headless: "new",
+        args: ["--no-sandbox", "--disable-setuid-sandbox"]
+      });     
       const page = await browser.newPage();
       await page.goto("https://y2mate.tools/en68/youtube-to-mp3.html", { waitUntil: "networkidle2" });
 
