@@ -12,7 +12,12 @@ const headers = {
 };
 
 const pendingDownloads = {};
-const LOGO_IMAGE = "https://github.com/danuwac/DANUWA-BOT/blob/main/images/Alive.png?raw=true"; // Replace with actual logo
+const LOGO_IMAGE = "https://github.com/danuwac/DANUWA-BOT/blob/main/images/Alive.png?raw=true"; // Replace with your DANUWA-MD logo image URL
+
+// Newsletter info for contextInfo forwarding
+const channelJid = '120363418166326365@newsletter';
+const channelName = '🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁';
+const channelInvite = '0029Vb65OhH7oQhap1fG1y3o';
 
 async function fetchGovdocItems(categorySlug) {
   const items = [];
@@ -49,37 +54,80 @@ async function fetchGovdocItems(categorySlug) {
   return items;
 }
 
-function setupInlineGovdocCommand({ pattern, slug, label, requiresGrade, styleId }) {
-  cmd({ pattern, react: "📘", desc: `Download ${label}`, category: "education", filename: __filename },
+function setupGovdocCommand({ pattern, slug, label, requiresGrade, heading, reactionEmoji }) {
+  cmd(
+    {
+      pattern,
+      react: reactionEmoji,
+      desc: `Download ${label} from govdoc.lk`,
+      category: "education",
+      filename: __filename,
+    },
     async (robin, mek, m, { from, q, sender, reply }) => {
-      if (requiresGrade && (!q || !/grade\s+\d+/i.test(q))) return reply(`❌ Example: .${pattern} grade 11`);
+      if (requiresGrade && (!q || !/grade\s+\d+/i.test(q)))
+        return reply(`❌ Example: .${pattern} grade 11`);
+
       let categorySlug = slug;
+      let gradeTerm = "";
       if (requiresGrade) {
         const input = q.trim().toLowerCase().split(/\s+/);
-        const gradeIndex = input.findIndex(w => w === "grade");
-        if (gradeIndex === -1 || !input[gradeIndex + 1]) return reply("❌ Grade missing. Use format like `.textbook grade 11`");
+        const gradeIndex = input.findIndex((w) => w === "grade");
+        if (gradeIndex === -1 || !input[gradeIndex + 1])
+          return reply("❌ Grade missing. Use format like `.textbook grade 11`");
         const grade = input[gradeIndex + 1];
         categorySlug = `${slug}/grade-${grade}`;
+        gradeTerm = `Grade ${grade}`;
       }
 
       const items = await fetchGovdocItems(categorySlug);
-      if (!items.length) return reply(`❌ No ${label.toLowerCase()} found.`);
 
-      const grade = requiresGrade ? categorySlug.split("/")[1].replace("grade-", "") : "";
-      const msg = generateStyledMessage(items, label, grade, styleId);
-      const buttons = items.slice(0, 15).map((item, i) => ({
-        buttonId: `govdoc_item_${i}_${sender}`,
-        buttonText: { displayText: `${i + 1}` },
-        type: 1,
-      }));
+      if (!items.length)
+        return reply(
+          `❌ No ${label.toLowerCase()} found${
+            gradeTerm ? ` for ${gradeTerm}` : ""
+          }.`
+        );
 
-      await robin.sendMessage(from, {
-        image: { url: LOGO_IMAGE },
-        caption: msg,
-        footer: "Reply using buttons below",
-        buttons,
-        headerType: 4,
-      }, { quoted: mek });
+      // Compose header with category, search term, and results count
+      const header = `╭───── ⭓ ${heading} ⭓ ─────╮
+│ 📂 Category: ${label}
+│ 🔎 Search: ${gradeTerm || "N/A"}
+│ 📊 Results: ${items.length}
+╰────────────────────────────╯
+
+`;
+
+      // Compose item list with spacing and numbering
+      let msg = header;
+      items.forEach((item, i) => {
+        msg += `*${i + 1}.* ${item.title}\n\n`;
+      });
+
+      msg += `Reply with the number of the item you want to download.\n\n`;
+
+      // Add newsletter info block
+      msg += `📰 *Subscribe to our Newsletter*\n*${channelName}*\nInvite Code: ${channelInvite}`;
+
+      await robin.sendMessage(
+        from,
+        {
+          caption: msg,
+          image: { url: LOGO_IMAGE },
+          contextInfo: {
+            forwardingScore: 999,
+            isForwarded: true,
+            forwardedNewsletterMessageInfo: {
+              newsletterJid: channelJid,
+              newsletterName: channelName,
+              serverMessageId: -1,
+            },
+          },
+        },
+        {
+          quoted: mek,
+          react: reactionEmoji,
+        }
+      );
 
       pendingDownloads[sender] = {
         step: "select",
@@ -87,152 +135,196 @@ function setupInlineGovdocCommand({ pattern, slug, label, requiresGrade, styleId
         quoted: mek,
         label,
         requiresGrade,
+        heading,
+        gradeTerm,
+        reactionEmoji,
       };
-    });
-
-  cmd({
-    on: "message",
-    filter: (msg, { sender }) => msg.key?.id?.startsWith("govdoc_item_") && pendingDownloads[sender]?.step === "select",
-  }, async (robin, mek, m, { from, sender }) => {
-    const parts = mek.key.id.split("_");
-    const index = parseInt(parts[2]);
-    const pending = pendingDownloads[sender];
-    const selectedItem = pending.results[index];
-
-    try {
-      const { data } = await axios.get(selectedItem.link, { headers });
-      const $ = cheerio.load(data);
-      const languages = [];
-      $("a[href*='/view?id=']").each((_, el) => {
-        const href = $(el).attr("href");
-        const lang = $(el).find("button").text().trim() || "Document";
-        if (href) {
-          languages.push({
-            lang,
-            link: href.startsWith("http") ? href : `https://govdoc.lk${href}`,
-          });
-        }
-      });
-
-      if (!languages.length) return reply("⚠️ No language versions found.");
-
-      const langButtons = languages.map((l, i) => ({
-        buttonId: `govdoc_dl_${i}_${sender}`,
-        buttonText: { displayText: l.lang },
-        type: 1,
-      }));
-
-      await robin.sendMessage(from, {
-        text: `🌐 Select a language for: *${selectedItem.title}*`,
-        footer: "DANUWA-MD BOT",
-        buttons: langButtons,
-        headerType: 1,
-      }, { quoted: mek });
-
-      pendingDownloads[sender] = {
-        step: "download",
-        selected: selectedItem,
-        languages,
-        quoted: mek,
-        label: pending.label,
-        requiresGrade: pending.requiresGrade,
-      };
-    } catch (e) {
-      console.error(e);
-      delete pendingDownloads[sender];
-      reply("⚠️ Failed to fetch language options.");
     }
-  });
+  );
 
-  cmd({
-    on: "message",
-    filter: (msg, { sender }) => msg.key?.id?.startsWith("govdoc_dl_") && pendingDownloads[sender]?.step === "download",
-  }, async (robin, mek, m, { from, sender }) => {
-    const parts = mek.key.id.split("_");
-    const index = parseInt(parts[2]);
-    const pending = pendingDownloads[sender];
-    const lang = pending.languages[index];
-    const downloadDir = path.join(os.tmpdir(), `govdoc-${Date.now()}`);
+  cmd(
+    {
+      filter: (text, { sender }) =>
+        pendingDownloads[sender] &&
+        pendingDownloads[sender].step === "select" &&
+        /^\d+$/.test(text.trim()),
+    },
+    async (robin, mek, m, { from, body, sender, reply }) => {
+      const pending = pendingDownloads[sender];
+      const selected = parseInt(body.trim());
 
-    try {
-      fs.mkdirSync(downloadDir);
-      const browser = await puppeteer.launch({
-        headless: "new",
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
-      });
+      if (selected < 1 || selected > pending.results.length)
+        return reply("❌ Invalid selection.");
 
-      const page = await browser.newPage();
-      await page._client().send("Page.setDownloadBehavior", {
-        behavior: "allow",
-        downloadPath: downloadDir,
-      });
+      const selectedItem = pending.results[selected - 1];
 
-      await page.goto(lang.link, { waitUntil: "networkidle2", timeout: 30000 });
-      await page.waitForSelector('a.btn.w-100[href*="/download/"]', { timeout: 15000 });
-      await page.click('a.btn.w-100[href*="/download/"]');
+      try {
+        const { data } = await axios.get(selectedItem.link, { headers });
+        const $ = cheerio.load(data);
 
-      let fileName;
-      for (let i = 0; i < 20; i++) {
-        const files = fs.readdirSync(downloadDir).filter(f => f.endsWith(".pdf"));
-        if (files.length > 0) {
-          fileName = files[0];
-          break;
+        const languages = [];
+        $("a[href*='/view?id=']").each((_, el) => {
+          const href = $(el).attr("href");
+          const lang = $(el).find("button").text().trim() || "Document";
+          if (href) {
+            languages.push({
+              lang,
+              link: href.startsWith("http") ? href : `https://govdoc.lk${href}`,
+            });
+          }
+        });
+
+        if (!languages.length) {
+          const directDownload = $("a.btn.w-100[href*='/download/']").attr("href");
+          if (directDownload) {
+            const pdfUrl = directDownload.startsWith("http")
+              ? directDownload
+              : `https://govdoc.lk${directDownload}`;
+            await robin.sendMessage(
+              from,
+              { text: `📄 Direct download link:\n${pdfUrl}` },
+              { quoted: mek }
+            );
+            delete pendingDownloads[sender];
+            return;
+          }
+          delete pendingDownloads[sender];
+          return reply("⚠️ No language versions found.");
         }
-        await new Promise((res) => setTimeout(res, 1000));
+
+        let langMsg = `🌐 *Available Languages for:* _${selectedItem.title}_\n\n`;
+        languages.forEach((l, i) => {
+          langMsg += `*${i + 1}.* ${l.lang}\n\n`;
+        });
+        langMsg += `Reply with the number (1-${languages.length}) to download the document.`;
+
+        await robin.sendMessage(from, { text: langMsg }, { quoted: mek });
+
+        pendingDownloads[sender] = {
+          step: "download",
+          selected: selectedItem,
+          languages,
+          quoted: mek,
+          label: pending.label,
+          requiresGrade: pending.requiresGrade,
+          heading: pending.heading,
+          gradeTerm: pending.gradeTerm,
+          reactionEmoji: pending.reactionEmoji,
+        };
+      } catch (e) {
+        console.error(e);
+        delete pendingDownloads[sender];
+        reply("⚠️ Failed to fetch language options.");
       }
-
-      await browser.close();
-      if (!fileName) throw new Error("Download timed out.");
-
-      const filePath = path.join(downloadDir, fileName);
-      const pdfBuffer = fs.readFileSync(filePath);
-      const niceName = `${pending.selected.title} - ${lang.lang}.pdf`;
-
-      await robin.sendMessage(from, {
-        document: pdfBuffer,
-        mimetype: "application/pdf",
-        fileName: niceName,
-        caption: `✅ *Download Complete!*\n📄 ${niceName}`,
-      }, { quoted: mek });
-
-      fs.unlinkSync(filePath);
-      fs.rmdirSync(downloadDir);
-      delete pendingDownloads[sender];
-    } catch (e) {
-      console.error("❌ Puppeteer error:", e.message);
-      reply("⛔ Failed to download the PDF.");
-      delete pendingDownloads[sender];
     }
-  });
+  );
+
+  cmd(
+    {
+      filter: (text, { sender }) =>
+        pendingDownloads[sender] &&
+        pendingDownloads[sender].step === "download" &&
+        /^\d+$/.test(text.trim()),
+    },
+    async (robin, mek, m, { from, body, sender, reply }) => {
+      const pending = pendingDownloads[sender];
+      const selected = parseInt(body.trim());
+
+      if (selected < 1 || selected > pending.languages.length)
+        return reply("❌ Invalid selection.");
+
+      const lang = pending.languages[selected - 1];
+      const downloadDir = path.join(os.tmpdir(), `govdoc-${Date.now()}`);
+
+      try {
+        fs.mkdirSync(downloadDir);
+
+        const browser = await puppeteer.launch({
+          headless: "new",
+          args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        });
+
+        const page = await browser.newPage();
+        await page._client().send("Page.setDownloadBehavior", {
+          behavior: "allow",
+          downloadPath: downloadDir,
+        });
+
+        await page.goto(lang.link, { waitUntil: "networkidle2", timeout: 30000 });
+        await page.waitForSelector('a.btn.w-100[href*="/download/"]', { timeout: 15000 });
+        await page.click('a.btn.w-100[href*="/download/"]');
+
+        let fileName;
+        for (let i = 0; i < 20; i++) {
+          const files = fs.readdirSync(downloadDir).filter((f) => f.endsWith(".pdf"));
+          if (files.length > 0) {
+            fileName = files[0];
+            break;
+          }
+          await new Promise((res) => setTimeout(res, 1000));
+        }
+
+        await browser.close();
+
+        if (!fileName) throw new Error("Download did not complete in time.");
+
+        const filePath = path.join(downloadDir, fileName);
+        const pdfBuffer = fs.readFileSync(filePath);
+        const niceName = `${pending.selected.title} - ${lang.lang}.pdf`;
+
+        await robin.sendMessage(
+          from,
+          {
+            document: pdfBuffer,
+            mimetype: "application/pdf",
+            fileName: niceName,
+            caption: `✅ Download complete!\n📄 ${niceName}`,
+          },
+          { quoted: mek }
+        );
+
+        fs.unlinkSync(filePath);
+        fs.rmdirSync(downloadDir);
+        delete pendingDownloads[sender];
+      } catch (e) {
+        console.error("❌ Puppeteer download failed:", e.message);
+        reply("⚠️ Failed to download PDF.");
+        delete pendingDownloads[sender];
+      }
+    }
+  );
 }
 
-function generateStyledMessage(items, label, grade, styleId) {
-  switch (styleId) {
-    case 1:
-      return `╭──── ⭓ GOVDOC CENTER ⭓ ────╮\n│ 📰 Category: ${label}\n│ 📅 Grade: ${grade}\n╰─────────────────────────╯\n\n` +
-        items.map((v, i) => `➤ ${i + 1}. ${v.title}\n`).join("\n") +
-        `\n📝 Tap a button to select.`;
-    case 3:
-      return `╔═════════ 📚 ${label.toUpperCase()} ═════════╗\n║ 🎓 Grade: ${grade}\n║ 🗂️ From: govdoc.lk\n╟──────────────────────────────╢\n` +
-        items.map((v, i) => `║ ${i + 1}️⃣ ${v.title}`).join("\n") +
-        `\n╚══════════════════════════════╝\n📌 Tap a number below.`;
-    case 5:
-      return `╭────── ⭓ GOVDOC LIBRARY ⭓ ──────╮\n│ 📁 Category: ${label}\n│ 🎓 Grade: ${grade}\n│ 🔍 Select an item below:\n╰─────────────────────────────╯\n\n` +
-        items.map((v, i) => `📘 ${i + 1}. ${v.title}`).join("\n\n") +
-        `\n\n📥 Use buttons below.`;
-    case 10:
-      return `╭───── 🧿 GOVDOC CENTER 🧿 ─────╮\n│ 📘 ${label}\n│ 🎓 Grade: ${grade}\n│ 🤖 Powered by DANUWA-MD\n╰────────────────────────────╯\n\n` +
-        items.map((v, i) => `🔹 ${i + 1}. ${v.title}`).join("\n\n") +
-        `\n✏️ Tap to continue.`;
-    default:
-      return `*📚 ${label} (Grade ${grade})*\n` +
-        items.map((v, i) => `*${i + 1}.* ${v.title}`).join("\n") +
-        `\n_Use inline buttons to select._`;
-  }
-}
-
-// Register commands with inline styles
-setupInlineGovdocCommand({ pattern: "textbook", slug: "text-books", label: "Textbooks", requiresGrade: true, styleId: 5 });
-setupInlineGovdocCommand({ pattern: "tguide", slug: "teacher-guides", label: "Teacher Guides", requiresGrade: true, styleId: 10 });
-setupInlineGovdocCommand({ pattern: "syllabus", slug: "syllabus", label: "Syllabus", requiresGrade: true, styleId: 3 });
-setupInlineGovdocCommand({ pattern: "gazette", slug: "gazette", label: "Gazette", requiresGrade: false, styleId: 1 });
+// Setup commands with custom headings and reaction emojis
+setupGovdocCommand({
+  pattern: "textbook",
+  slug: "text-books",
+  label: "Textbooks",
+  requiresGrade: true,
+  heading: "Textbook Library",
+  reactionEmoji: "📚",
+});
+setupGovdocCommand({
+  pattern: "tguide",
+  slug: "teacher-guides",
+  label: "Teacher Guides",
+  requiresGrade: true,
+  heading: "Teacher Guide Library",
+  reactionEmoji: "🧑‍🏫",
+});
+setupGovdocCommand({
+  pattern: "syllabus",
+  slug: "syllabus",
+  label: "Syllabus",
+  requiresGrade: true,
+  heading: "Syllabus Library",
+  reactionEmoji: "📜",
+});
+setupGovdocCommand({
+  pattern: "gazette",
+  slug: "gazette",
+  label: "Gazette",
+  requiresGrade: false,
+  heading: "Gazette Library",
+  reactionEmoji: "📢",
+});
