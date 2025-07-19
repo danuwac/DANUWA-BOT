@@ -66,7 +66,6 @@ cmd(
             },
           },
         },
-        ),
         { quoted: mek }
       );
     } catch (e) {
