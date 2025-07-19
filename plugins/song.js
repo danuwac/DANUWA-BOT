@@ -1,17 +1,12 @@
-const { cmd } = require("../command");
-const axios = require("axios");
-const fs = require("fs");
-const path = require("path");
-const ffmpeg = require("fluent-ffmpeg");
-const { promisify } = require("util");
-const { pipeline } = require("stream");
-const streamPipeline = promisify(pipeline);
+const { cmd, commands } = require("../command");
+const yts = require("yt-search");
+const { ytmp3 } = require("@vreden/youtube_scraper");
 
 cmd(
   {
     pattern: "song",
     react: "🎶",
-    desc: "Download MP3 from YouTube link",
+    desc: "Download Song",
     category: "download",
     filename: __filename,
   },
@@ -21,73 +16,107 @@ cmd(
     m,
     {
       from,
+      quoted,
+      body,
+      isCmd,
+      command,
+      args,
       q,
+      isGroup,
+      sender,
+      senderNumber,
+      botNumber2,
+      botNumber,
+      pushname,
+      isMe,
+      isOwner,
+      groupMetadata,
+      groupName,
+      participants,
+      groupAdmins,
+      isBotAdmins,
+      isAdmins,
       reply,
     }
   ) => {
     try {
-      const isYoutubeUrl = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be|music\.youtube\.com)\//i.test(q);
-      if (!q || !isYoutubeUrl) {
-        return reply("✳️ *Usage:* .ytmp3 <YouTube URL>");
-      }
+      if (!q) return reply("❌ *Please provide a song name or YouTube link* 🌟🎵");
 
-      await robin.sendMessage(from, { react: { text: "⏳", key: mek.key } });
+      // Search for the video
+      const search = await yts(q);
+      const data = search.videos[0];
+      const url = data.url;
 
-      const apiURL = `https://api.neoxr.eu/api/youtube?url=${encodeURIComponent(q)}&type=audio&quality=128kbps&apikey=russellxz`;
-      const res = await axios.get(apiURL);
-      const json = res.data;
+      // Song metadata description
+      let desc = `
+           🌟 𝗪𝗘𝗟𝗖𝗢𝗠𝗘 𝗧𝗢 🌟    
+════════════════════════     
+🔮  Ｄ  Ａ  Ｎ  Ｕ  Ｗ  Ａ  －  Ｍ  Ｄ  🔮  
+      🎧 𝙎𝙊𝙉𝙂 𝘿𝙊𝙒𝙉𝙇𝙊𝘼𝘿𝙀𝙍 🎧  
+════════════════════════   
 
-      if (!json.status || !json.data?.url) {
-        throw new Error("❌ Couldn't fetch audio file.");
-      }
+🎼 Let the rhythm guide you... 🎼
+🚀 Pow. By *DANUKA DISANAYAKA* 🔥
+─────────────────────────
 
-      const { data, title, fduration, thumbnail } = json;
+🎬 *Title:* ${data.title}
+⏱️ *Duration:* ${data.timestamp}
+📅 *Uploaded:* ${data.ago}
+👀 *Views:* ${data.views.toLocaleString()}
+🔗 *Watch Here:* ${data.url}
 
+─────────────────────────
+🎼 Made with ❤️ by *DANUKA DISANAYAKA💫*
+`;
+
+      // Send metadata thumbnail message
       await robin.sendMessage(
         from,
-        {
-          image: { url: thumbnail },
-          caption: `🎧 *TITLE:* ${title}\n🕒 *DURATION:* ${fduration}\n📥 *SIZE:* ${data.size}\n\n⏳ *Downloading...*`,
-        },
+        { image: { url: data.thumbnail }, caption: desc },
         { quoted: mek }
       );
 
-      const tmpDir = path.join(__dirname, "../tmp");
-      if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir);
+      // Download the audio using @vreden/youtube_scraper
+      const quality = "128"; // Default quality
+      const songData = await ytmp3(url, quality);
 
-      const rawPath = path.join(tmpDir, `${Date.now()}_raw.m4a`);
-      const finalPath = path.join(tmpDir, `${Date.now()}_final.mp3`);
+      // Validate song duration (limit: 30 minutes)
+      let durationParts = data.timestamp.split(":").map(Number);
+      let totalSeconds =
+        durationParts.length === 3
+          ? durationParts[0] * 3600 + durationParts[1] * 60 + durationParts[2]
+          : durationParts[0] * 60 + durationParts[1];
 
-      const audioRes = await axios.get(data.url, { responseType: "stream" });
-      await streamPipeline(audioRes.data, fs.createWriteStream(rawPath));
+      if (totalSeconds > 1800) {
+        return reply("⏳ *Sorry, audio files longer than 30 minutes are not supported.*");
+      }
 
-      await new Promise((resolve, reject) => {
-        ffmpeg(rawPath)
-          .audioCodec("libmp3lame")
-          .audioBitrate("128k")
-          .save(finalPath)
-          .on("end", resolve)
-          .on("error", reject);
-      });
-
+      // Send audio file
       await robin.sendMessage(
         from,
         {
-          audio: fs.readFileSync(finalPath),
+          audio: { url: songData.download.url },
           mimetype: "audio/mpeg",
-          fileName: data.filename || `${title}.mp3`,
         },
         { quoted: mek }
       );
 
-      fs.unlinkSync(rawPath);
-      fs.unlinkSync(finalPath);
+      // Send as a document (optional)
+      await robin.sendMessage(
+        from,
+        {
+          document: { url: songData.download.url },
+          mimetype: "audio/mpeg",
+          fileName: `${data.title}.mp3`,
+          caption: "🎶 *Your song is ready to be played!* \n🎼 Made with ❤️ by *DANUKA DISANAYAKA💫*",
+        },
+        { quoted: mek }
+      );
 
-      await robin.sendMessage(from, { react: { text: "✅", key: mek.key } });
-    } catch (err) {
-      console.error(err);
-      await reply(`❌ *Error:* ${err.message}`);
-      await robin.sendMessage(from, { react: { text: "❌", key: mek.key } });
+      return reply("✅ *Thank you for using DANUWA-MD! Enjoy your music* 🎧💖");
+    } catch (e) {
+      console.log(e);
+      reply(`❌ *Error:* ${e.message} 😞`);
     }
   }
 );
