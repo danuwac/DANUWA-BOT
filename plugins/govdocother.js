@@ -12,7 +12,7 @@ const headers = {
 };
 
 const pendingDownloads = {};
-const LOGO_IMAGE = "https://i.imgur.com/YOUR_LOGO.png"; // replace with your DANUWA-MD logo
+const LOGO_IMAGE = "https://github.com/danuwac/DANUWA-BOT/blob/main/images/Alive.png?raw=true"; // replace with your DANUWA-MD logo
 
 async function fetchGovdocItems(categorySlug) {
   const items = [];
