@@ -39,6 +39,7 @@ const menus = [
     { pattern: "main", title: "🏠 MAIN" },
     { pattern: "owner", title: "👑 OWNER" },
     { pattern: "other", title: "📂 OTHER" }
+    { pattern: "education", title: "🎓 EDUCATION" }
 ];
 
 menus.forEach(menu => {
