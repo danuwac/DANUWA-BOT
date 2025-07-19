@@ -1,6 +1,12 @@
 const { cmd } = require("../command");
+const axios = require("axios");
 const yts = require("yt-search");
-const ytdl = require("ytdl-core");
+
+const headers = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "Accept-Language": "en-US,en;q=0.9",
+};
 
 cmd(
   {
@@ -14,71 +20,60 @@ cmd(
     try {
       if (!q) return reply("❌ *Please provide a song name or YouTube link* 🌟🎵");
 
-      // Search for video
-      let videoUrl = q;
-      if (!ytdl.validateURL(q)) {
-        const search = await yts(q);
-        if (!search || !search.videos.length)
-          return reply("❌ *No results found for your query*.");
-        videoUrl = search.videos[0].url;
-      }
+      // 🔍 Search
+      const search = await yts(q);
+      if (!search.videos.length) return reply("❌ No video found.");
 
-      const info = await ytdl.getInfo(videoUrl);
-      const title = info.videoDetails.title;
-      const lengthSeconds = parseInt(info.videoDetails.lengthSeconds);
+      const video = search.videos[0];
+      const url = video.url;
 
-      if (lengthSeconds > 1800)
-        return reply("⏳ *Sorry, audio files longer than 30 minutes are not supported.*");
-
-      const thumbnail = info.videoDetails.thumbnails.pop().url;
-      const duration = new Date(lengthSeconds * 1000).toISOString().substr(11, 8);
-
-      // Send preview
-      const caption = `
-🎧 *SONG DOWNLOAD*
-─────────────────────
-🎬 *Title:* ${title}
-⏳ *Duration:* ${duration}
-🔗 *Link:* ${videoUrl}
-─────────────────────
+      // 🧾 Send preview
+      let caption = `
+🎧 *SONG DOWNLOADER*
+────────────────────
+🎬 *Title:* ${video.title}
+⏱️ *Duration:* ${video.timestamp}
+📅 *Uploaded:* ${video.ago}
+👁️ *Views:* ${video.views.toLocaleString()}
+🔗 *Link:* ${video.url}
+────────────────────
 🎼 Made with ❤️ by *DANUKA DISANAYAKA💫*
 `.trim();
 
-      await robin.sendMessage(from, { image: { url: thumbnail }, caption }, { quoted: mek });
+      await robin.sendMessage(
+        from,
+        { image: { url: video.thumbnail }, caption },
+        { quoted: mek }
+      );
 
-      // Get audio URL manually (with headers patch)
-      const format = ytdl.chooseFormat(info.formats, {
-        filter: "audioonly",
-        quality: "highestaudio",
-      });
+      // 🔄 Convert using savetube.su backend
+      const api = "https://cdn306.savetube.su/api/ajaxSearch";
+      const res = await axios.post(
+        api,
+        new URLSearchParams({ q: url }),
+        { headers }
+      );
 
-      if (!format || !format.url) throw new Error("Couldn't fetch audio file.");
+      const audioInfo = res.data.links?.mp3?.mp3128;
+      if (!audioInfo || !audioInfo.url) {
+        return reply("❌ Couldn't fetch audio file.");
+      }
 
-      // Add headers to avoid 410
-      const headers = {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-      };
-
-      // Send audio
+      // ⏬ Send audio
       await robin.sendMessage(
         from,
         {
-          audio: {
-            url: format.url,
-            headers,
-          },
+          audio: { url: audioInfo.url },
           mimetype: "audio/mpeg",
-          fileName: `${title}.mp3`,
+          fileName: `${video.title}.mp3`,
         },
         { quoted: mek }
       );
 
-      reply("✅ *Here is your song! Enjoy 🎶*");
-    } catch (err) {
-      console.error(err);
-      reply("❌ *Couldn't fetch audio file.* Please try again later.");
+      return reply("✅ *Enjoy your song!* 🎶");
+    } catch (e) {
+      console.log("SONG ERROR:", e);
+      reply("❌ *Error downloading song. Try another title.*");
     }
   }
 );
