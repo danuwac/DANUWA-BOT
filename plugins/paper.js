@@ -43,9 +43,13 @@ async (conn, mek, m, {
 │    └ Use: *.textbook grade subject*
 │    └ Ex: *.textbook 6 tamil*
 │──────────────────────⬣
-│ 📑 *Syllabus & Teachers' Guides*
+│ 📑 *Syllabus*
 │    └ Use: *.syllabus grade subject*
 │    └ Ex: *.syllabus 11 maths*
+│──────────────────────⬣
+│ 📑 *Teachers' Guides*
+│    └ Use: *.tguide grade subject*
+│    └ Ex: *.tguide 11 maths*
 │──────────────────────⬣
 │ 📰 *Government Gazette Downloads*
 │    └ Use: *.gazette keyword*
