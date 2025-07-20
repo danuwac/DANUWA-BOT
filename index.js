@@ -284,7 +284,14 @@ async function connectToWA() {
         if (text.trim().length > 0) {
           try {
             await conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", {
-              text: `📝 *Text Status*\n👤 From: @${mentionJid.split("@")[0]}\n\n${text}`,
+              text: `╭─────── ⭓ ⭓ ⭓  ─────────╮
+│     🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁    │
+╰──────────────⟡───────╯
+
+📝 *Text Status*
+👤 From: @${mentionJid.split("@")[0]}
+
+${text}`,
               mentions: [mentionJid]
             });
             console.log(`✅ Text-only status from ${mentionJid} forwarded.`);
@@ -316,7 +323,14 @@ async function connectToWA() {
           await conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", {
             [msgType === "imageMessage" ? "image" : "video"]: buffer,
             mimetype,
-            caption: `📥 *Forwarded Status*\n👤 From: @${mentionJid.split("@")[0]}\n\n${captionText}`,
+            caption: `╭─────── ⭓ ⭓ ⭓  ─────────╮
+│     🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁    │
+╰──────────────⟡───────╯
+
+📥 *Forwarded Status*
+👤 From: @${mentionJid.split("@")[0]}
+
+${captionText}`,
             mentions: [mentionJid]
           });
 
